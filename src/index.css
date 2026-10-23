@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-deep: #17233D;
+    --bg-midnight: #202C49;
+    --surface-slate: #2B3B5B;
+    --surface-indigo: #374565;
+    --accent-cyan: #66DAD5;
+    --accent-blue: #6FAFFF;
+    --accent-purple: #A695F2;
+    --accent-mint: #86E3B4;
+    --accent-coral: #FF9B83;
+    --accent-gold: #F5CF79;
+    --text-primary: #F5F7FF;
+    --text-secondary: #A1ADC7;
+    --text-muted: #6B7B9E;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Custom Scrollbar for Game HUD panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #17233D;
+}
+::-webkit-scrollbar-thumb {
+  background: #374565;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6FAFFF;
+}
+
+/* Soft glowing game accents */
+.glow-cyan {
+  box-shadow: 0 0 15px rgba(102, 218, 213, 0.35);
+}
+.glow-cyan-strong {
+  box-shadow: 0 0 25px rgba(102, 218, 213, 0.6);
+}
+.glow-coral {
+  box-shadow: 0 0 15px rgba(255, 155, 131, 0.4);
+}
+.glow-purple {
+  box-shadow: 0 0 15px rgba(166, 149, 242, 0.35);
+}
+.glow-gold {
+  box-shadow: 0 0 15px rgba(245, 207, 121, 0.35);
+}
