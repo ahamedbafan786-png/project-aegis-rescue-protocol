@@ -79,5 +79,6 @@ TypeScript compiles with 0 errors and 0 warnings.
 
 ---
 
-## 3. Local Server Status
-- Vite Dev Server: Active at `http://localhost:5173/` (HTTP 200 OK verified).
+## 3. Deployment Status
+- **Vercel Production Domain**: [https://project-aegis-theta.vercel.app](https://project-aegis-theta.vercel.app) (HTTP 200 OK verified)
+- **Local Dev Server**: Active at `http://localhost:5173/` (HTTP 200 OK verified).

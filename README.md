@@ -4,6 +4,7 @@
 > **Academic Topic**: Robot Path Planning using A* Algorithm  
 > **Course**: Design & Analysis of Algorithms (DAA) / Artificial Intelligence / Robotics  
 > **Target Audience**: University Lecturer Demonstration & Live Viva Examination  
+> **Live Production URL**: [https://project-aegis-theta.vercel.app](https://project-aegis-theta.vercel.app)  
 
 ---
 
