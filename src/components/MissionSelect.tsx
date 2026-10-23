@@ -1,14 +1,7 @@
 import React from 'react';
 import {
-  AlertTriangle,
   ArrowRight,
-  CheckCircle2,
-  Compass,
-  Flame,
-  MonitorPlay,
-  Play,
   Shield,
-  Sparkles,
   Star,
 } from 'lucide-react';
 import { sound } from '../game/soundEngine';
@@ -37,7 +30,7 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
               SELECT RESCUE MISSION
             </h2>
             <p className="text-sm text-[#A1ADC7] mt-1">
-              Deploy Aegis-1 into active disaster scenarios. Choose a mission to begin autonomous route planning.
+              Deploy Aegis-1 into active disaster sectors. Choose a scenario to commence autonomous route planning.
             </p>
           </div>
         </div>
@@ -56,6 +49,8 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
               PRESENTATION: 'text-[#FF9B83] bg-[#FF9B83]/15 border-[#FF9B83]/40',
             };
 
+            const wallSet = new Set(mission.initialWalls.map((w) => `${w.r},${w.c}`));
+
             return (
               <div
                 key={mission.id}
@@ -63,15 +58,15 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                   sound.playClick();
                   onSelectMission(mission);
                 }}
-                className={`group relative rounded-2xl p-6 transition-all duration-200 cursor-pointer flex flex-col justify-between border ${
+                className={`group relative rounded-2xl p-5 transition-all duration-200 cursor-pointer flex flex-col justify-between border ${
                   isPresentation
-                    ? 'bg-gradient-to-b from-[#2B3B5B]/80 to-[#1F2C47] border-[#FF9B83]/50 hover:border-[#FF9B83] shadow-lg shadow-[#FF9B83]/10 hover:shadow-[#FF9B83]/20'
-                    : 'bg-[#1F2C47]/80 hover:bg-[#253554] border-[#2B3B5B] hover:border-[#66DAD5]/60 hover:shadow-xl hover:shadow-[#66DAD5]/10'
+                    ? 'bg-gradient-to-b from-[#2B3B5B]/85 to-[#1F2C47] border-[#FF9B83]/50 hover:border-[#FF9B83] shadow-lg shadow-[#FF9B83]/10 hover:shadow-[#FF9B83]/20'
+                    : 'bg-[#1F2C47]/90 hover:bg-[#253554] border-[#2B3B5B] hover:border-[#66DAD5]/60 hover:shadow-xl hover:shadow-[#66DAD5]/10'
                 } hover:-translate-y-1`}
               >
                 <div>
                   {/* Top Bar / Badges */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
                     <span className="text-[11px] font-mono font-bold text-[#A1ADC7] tracking-wider uppercase">
                       {mission.badgeLabel}
                     </span>
@@ -85,27 +80,60 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                   </div>
 
                   {/* Title & Subtitle */}
-                  <h3 className="text-xl font-bold text-[#F5F7FF] group-hover:text-[#66DAD5] transition-colors leading-tight">
+                  <h3 className="text-lg font-bold text-[#F5F7FF] group-hover:text-[#66DAD5] transition-colors leading-tight">
                     {mission.title}
                   </h3>
-                  <h4 className="text-xs font-semibold text-[#A1ADC7] mt-1 tracking-wide">
+                  <h4 className="text-xs font-semibold text-[#A1ADC7] mt-0.5 tracking-wide">
                     {mission.subtitle}
                   </h4>
 
+                  {/* Procedural Mini-Map Preview (Eliminates Generic AI Card Look) */}
+                  <div className="my-3.5 p-2 bg-[#17233D] rounded-xl border border-[#2B3B5B] flex items-center justify-center">
+                    <div
+                      className="grid gap-[2px] bg-[#121A2B] p-1.5 rounded-lg border border-[#23324E]"
+                      style={{
+                        gridTemplateColumns: `repeat(${Math.min(22, mission.cols)}, minmax(0, 1fr))`,
+                      }}
+                    >
+                      {Array.from({ length: Math.min(12, mission.rows) }).map((_, r) =>
+                        Array.from({ length: Math.min(22, mission.cols) }).map((_, c) => {
+                          const isStart = r === mission.start.r && c === mission.start.c;
+                          const isTarget = r === mission.target.r && c === mission.target.c;
+                          const isWall = wallSet.has(`${r},${c}`);
+
+                          return (
+                            <div
+                              key={`${r},${c}`}
+                              className={`w-2 h-2 rounded-[1.5px] ${
+                                isStart
+                                  ? 'bg-[#6FAFFF] shadow-sm shadow-[#6FAFFF]'
+                                  : isTarget
+                                  ? 'bg-[#86E3B4] shadow-sm shadow-[#86E3B4]'
+                                  : isWall
+                                  ? 'bg-[#3A507A]'
+                                  : 'bg-[#1C273D]'
+                              }`}
+                            />
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
                   {/* Briefing Text */}
-                  <p className="text-xs text-[#A1ADC7]/90 leading-relaxed mt-3 line-clamp-3">
+                  <p className="text-xs text-[#A1ADC7]/80 leading-relaxed line-clamp-2">
                     {mission.briefing}
                   </p>
                 </div>
 
                 {/* Footer Telemetry & Stars */}
-                <div className="mt-6 pt-4 border-t border-[#2B3B5B]/60 flex items-center justify-between">
+                <div className="mt-4 pt-3 border-t border-[#2B3B5B]/60 flex items-center justify-between">
                   {/* Stars / Completion */}
                   <div className="flex items-center gap-1">
                     {[1, 2, 3].map((starIdx) => (
                       <Star
                         key={starIdx}
-                        className={`w-4 h-4 ${
+                        className={`w-3.5 h-3.5 ${
                           starIdx <= stars
                             ? 'text-[#F5CF79] fill-[#F5CF79]'
                             : 'text-[#374565]'
