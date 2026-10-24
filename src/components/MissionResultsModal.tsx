@@ -7,6 +7,7 @@ import {
   RotateCcw,
   Sparkles,
   Star,
+  X,
   Zap,
 } from 'lucide-react';
 import { sound } from '../game/soundEngine';
@@ -17,6 +18,7 @@ interface MissionResultsModalProps {
   replansCount: number;
   pathCost: number;
   targetStepsForStar3: number;
+  onClose?: () => void;
   onReplay: () => void;
   onNextMission: () => void;
 }
@@ -27,6 +29,7 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
   replansCount,
   pathCost,
   targetStepsForStar3,
+  onClose,
   onReplay,
   onNextMission,
 }) => {
@@ -50,6 +53,20 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#17233D]/80 backdrop-blur-md select-none animate-in fade-in duration-200">
       <div className="bg-gradient-to-b from-[#2B3B5B] to-[#1F2C47] border border-[#66DAD5]/40 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
+        {/* Close / Dismiss Button */}
+        {onClose && (
+          <button
+            onClick={() => {
+              sound.playClick();
+              onClose();
+            }}
+            title="Dismiss dialog and inspect board"
+            className="absolute top-4 right-4 p-2 rounded-xl bg-[#17233D]/60 hover:bg-[#17233D] text-[#A1ADC7] hover:text-[#F5F7FF] border border-[#2B3B5B] transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+
         {/* Subtle background glow */}
         <div className="absolute -top-24 w-48 h-48 bg-[#66DAD5]/20 rounded-full blur-3xl pointer-events-none" />
 

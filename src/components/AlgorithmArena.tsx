@@ -15,6 +15,13 @@ import { findPathDijkstra } from '../algorithms/dijkstra';
 import { AlgorithmMetrics, GridCoord, PathResult, TileType } from '../algorithms/types';
 import { sound } from '../game/soundEngine';
 
+interface BenchmarkStat {
+  median: number;
+  variance: number;
+  min: number;
+  max: number;
+}
+
 export const AlgorithmArena: React.FC = () => {
   // Preset arena maps
   const [mapType, setMapType] = useState<'corridor' | 'open' | 'maze'>('corridor');
@@ -60,44 +67,86 @@ export const AlgorithmArena: React.FC = () => {
     bfs: null,
   });
 
+  const [benchStats, setBenchStats] = useState<{
+    astar: BenchmarkStat;
+    dijkstra: BenchmarkStat;
+    bfs: BenchmarkStat;
+  }>({
+    astar: { median: 0, variance: 0, min: 0, max: 0 },
+    dijkstra: { median: 0, variance: 0, min: 0, max: 0 },
+    bfs: { median: 0, variance: 0, min: 0, max: 0 },
+  });
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const runBenchmark = () => {
     sound.playDeploy();
     const grid = getArenaGrid();
 
-    const astarRes = findPathAStar({
-      grid,
-      rows,
-      cols,
-      start,
-      goal,
-      movementMode: '4-directional',
-      heuristicType: 'manhattan',
-    });
+    const ITERATIONS = 7;
+    const astarTimes: number[] = [];
+    const dijkstraTimes: number[] = [];
+    const bfsTimes: number[] = [];
 
-    const dijkstraRes = findPathDijkstra({
-      grid,
-      rows,
-      cols,
-      start,
-      goal,
-      movementMode: '4-directional',
-    });
+    let astarRes: PathResult | null = null;
+    let dijkstraRes: PathResult | null = null;
+    let bfsRes: PathResult | null = null;
 
-    const bfsRes = findPathBFS({
-      grid,
-      rows,
-      cols,
-      start,
-      goal,
-      movementMode: '4-directional',
-    });
+    for (let i = 0; i < ITERATIONS; i++) {
+      const a = findPathAStar({
+        grid,
+        rows,
+        cols,
+        start,
+        goal,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      astarTimes.push(a.executionTimeMs);
+      if (i === 0) astarRes = a;
+
+      const d = findPathDijkstra({
+        grid,
+        rows,
+        cols,
+        start,
+        goal,
+        movementMode: '4-directional',
+      });
+      dijkstraTimes.push(d.executionTimeMs);
+      if (i === 0) dijkstraRes = d;
+
+      const b = findPathBFS({
+        grid,
+        rows,
+        cols,
+        start,
+        goal,
+        movementMode: '4-directional',
+      });
+      bfsTimes.push(b.executionTimeMs);
+      if (i === 0) bfsRes = b;
+    }
+
+    const calcStats = (times: number[]): BenchmarkStat => {
+      const sorted = [...times].sort((x, y) => x - y);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      const min = sorted[0];
+      const max = sorted[sorted.length - 1];
+      const variance = (max - min) / 2;
+      return { median, variance, min, max };
+    };
 
     setResults({
       astar: astarRes,
       dijkstra: dijkstraRes,
       bfs: bfsRes,
+    });
+
+    setBenchStats({
+      astar: calcStats(astarTimes),
+      dijkstra: calcStats(dijkstraTimes),
+      bfs: calcStats(bfsTimes),
     });
   };
 
@@ -129,7 +178,7 @@ export const AlgorithmArena: React.FC = () => {
     const offsetX = Math.floor((w - cols * tileSize) / 2);
     const offsetY = Math.floor((h - rows * tileSize) / 2);
 
-    ctx.fillStyle = '#17233D';
+    ctx.fillStyle = '#151F36';
     ctx.fillRect(0, 0, w, h);
 
     const grid = getArenaGrid();
@@ -145,11 +194,11 @@ export const AlgorithmArena: React.FC = () => {
         const y = offsetY + r * tileSize;
         const key = `${r},${c}`;
 
-        let fill = '#23324E';
+        let fill = '#1E2B47';
         let stroke = '#2B3B5B';
 
         if (grid[r][c] === 'WALL') {
-          fill = '#1A2740';
+          fill = '#121A2B';
         } else if (pathSet.has(key)) {
           fill = activeTab === 'astar' ? '#66DAD5' : activeTab === 'dijkstra' ? '#6FAFFF' : '#A695F2';
         } else if (exploredSet.has(key)) {
@@ -180,28 +229,26 @@ export const AlgorithmArena: React.FC = () => {
     }
   }, [results, activeTab, mapType]);
 
-  const activeRes = results[activeTab];
-
   return (
-    <div className="flex-1 w-full bg-[#17233D] text-[#F5F7FF] p-6 sm:p-10 select-none overflow-y-auto">
+    <div className="flex-1 w-full bg-[#151F36] text-[#F5F7FF] p-4 sm:p-8 select-none overflow-y-auto">
       <div className="max-w-6xl mx-auto flex flex-col gap-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#2B3B5B] pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-[#2B3B5B] pb-5">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono font-semibold text-[#6FAFFF] tracking-wider uppercase mb-1">
               <Layers className="w-4 h-4" />
               Comparative Evaluation Arena
             </div>
-            <h2 className="text-3xl font-extrabold tracking-tight text-[#F5F7FF]">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#F5F7FF]">
               ALGORITHM ARENA
             </h2>
-            <p className="text-sm text-[#A1ADC7] mt-1">
+            <p className="text-xs sm:text-sm text-[#A1ADC7] mt-1">
               Rigorous comparative analysis across A*, Dijkstra, and Breadth-First Search on identical map topographies.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-[#A1ADC7]">Map Topology:</span>
+            <span className="text-xs font-mono text-[#A1ADC7]">Topology:</span>
             {(['corridor', 'open', 'maze'] as const).map((m) => (
               <button
                 key={m}
@@ -211,8 +258,8 @@ export const AlgorithmArena: React.FC = () => {
                 }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold capitalize border transition-all ${
                   mapType === m
-                    ? 'bg-[#6FAFFF] text-[#17233D] border-[#6FAFFF] font-bold'
-                    : 'bg-[#1F2C47] text-[#A1ADC7] border-[#2B3B5B] hover:text-[#F5F7FF]'
+                    ? 'bg-[#6FAFFF] text-[#151F36] border-[#6FAFFF] font-bold'
+                    : 'bg-[#1C2844] text-[#A1ADC7] border-[#2B3B5B] hover:text-[#F5F7FF]'
                 }`}
               >
                 {m}
@@ -221,10 +268,10 @@ export const AlgorithmArena: React.FC = () => {
 
             <button
               onClick={runBenchmark}
-              className="ml-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] text-[#17233D] font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-[#66DAD5]/20 hover:scale-[1.02] transition-transform"
+              className="ml-2 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] text-[#151F36] font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-[#66DAD5]/20 hover:scale-[1.02] transition-transform"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Re-run
+              <span>Benchmark (7x)</span>
             </button>
           </div>
         </div>
@@ -234,10 +281,10 @@ export const AlgorithmArena: React.FC = () => {
           {/* A* Card */}
           <div
             onClick={() => setActiveTab('astar')}
-            className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+            className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
               activeTab === 'astar'
-                ? 'bg-[#1F2C47] border-[#66DAD5] shadow-lg shadow-[#66DAD5]/15'
-                : 'bg-[#1F2C47]/60 border-[#2B3B5B] hover:border-[#66DAD5]/40'
+                ? 'bg-[#1C2844] border-[#66DAD5] shadow-lg shadow-[#66DAD5]/15'
+                : 'bg-[#1C2844]/60 border-[#2B3B5B] hover:border-[#66DAD5]/40'
             }`}
           >
             <div className="flex items-center justify-between mb-3">
@@ -256,21 +303,27 @@ export const AlgorithmArena: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
-                <span className="text-[#A1ADC7]">Path Length:</span>
+                <span className="text-[#A1ADC7]">Path Nodes (N):</span>
                 <span className="font-mono font-bold text-[#F5F7FF]">
-                  {results.astar?.path.length ?? 0} steps
+                  {results.astar?.path.length ?? 0} cells
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
-                <span className="text-[#A1ADC7]">Optimal Cost:</span>
+                <span className="text-[#A1ADC7]">Movement Steps:</span>
+                <span className="font-mono font-bold text-[#6FAFFF]">
+                  {Math.max(0, (results.astar?.path.length ?? 1) - 1)} steps
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
+                <span className="text-[#A1ADC7]">Route Cost:</span>
                 <span className="font-mono font-bold text-[#86E3B4]">
-                  {results.astar?.totalCost ?? 0}
+                  {results.astar?.totalCost.toFixed(1) ?? '0.0'}
                 </span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-[#A1ADC7]">Runtime:</span>
+                <span className="text-[#A1ADC7]">Runtime (Median):</span>
                 <span className="font-mono font-bold text-[#F5CF79]">
-                  {results.astar?.executionTimeMs.toFixed(2) ?? '0.00'} ms
+                  {benchStats.astar.median.toFixed(2)} ms (±{benchStats.astar.variance.toFixed(2)})
                 </span>
               </div>
             </div>
@@ -279,10 +332,10 @@ export const AlgorithmArena: React.FC = () => {
           {/* Dijkstra Card */}
           <div
             onClick={() => setActiveTab('dijkstra')}
-            className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+            className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
               activeTab === 'dijkstra'
-                ? 'bg-[#1F2C47] border-[#6FAFFF] shadow-lg shadow-[#6FAFFF]/15'
-                : 'bg-[#1F2C47]/60 border-[#2B3B5B] hover:border-[#6FAFFF]/40'
+                ? 'bg-[#1C2844] border-[#6FAFFF] shadow-lg shadow-[#6FAFFF]/15'
+                : 'bg-[#1C2844]/60 border-[#2B3B5B] hover:border-[#6FAFFF]/40'
             }`}
           >
             <div className="flex items-center justify-between mb-3">
@@ -301,21 +354,27 @@ export const AlgorithmArena: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
-                <span className="text-[#A1ADC7]">Path Length:</span>
+                <span className="text-[#A1ADC7]">Path Nodes (N):</span>
                 <span className="font-mono font-bold text-[#F5F7FF]">
-                  {results.dijkstra?.path.length ?? 0} steps
+                  {results.dijkstra?.path.length ?? 0} cells
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
-                <span className="text-[#A1ADC7]">Optimal Cost:</span>
+                <span className="text-[#A1ADC7]">Movement Steps:</span>
+                <span className="font-mono font-bold text-[#6FAFFF]">
+                  {Math.max(0, (results.dijkstra?.path.length ?? 1) - 1)} steps
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
+                <span className="text-[#A1ADC7]">Route Cost:</span>
                 <span className="font-mono font-bold text-[#86E3B4]">
-                  {results.dijkstra?.totalCost ?? 0}
+                  {results.dijkstra?.totalCost.toFixed(1) ?? '0.0'}
                 </span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-[#A1ADC7]">Runtime:</span>
+                <span className="text-[#A1ADC7]">Runtime (Median):</span>
                 <span className="font-mono font-bold text-[#F5CF79]">
-                  {results.dijkstra?.executionTimeMs.toFixed(2) ?? '0.00'} ms
+                  {benchStats.dijkstra.median.toFixed(2)} ms (±{benchStats.dijkstra.variance.toFixed(2)})
                 </span>
               </div>
             </div>
@@ -324,10 +383,10 @@ export const AlgorithmArena: React.FC = () => {
           {/* BFS Card */}
           <div
             onClick={() => setActiveTab('bfs')}
-            className={`p-5 rounded-2xl border cursor-pointer transition-all ${
+            className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
               activeTab === 'bfs'
-                ? 'bg-[#1F2C47] border-[#A695F2] shadow-lg shadow-[#A695F2]/15'
-                : 'bg-[#1F2C47]/60 border-[#2B3B5B] hover:border-[#A695F2]/40'
+                ? 'bg-[#1C2844] border-[#A695F2] shadow-lg shadow-[#A695F2]/15'
+                : 'bg-[#1C2844]/60 border-[#2B3B5B] hover:border-[#A695F2]/40'
             }`}
           >
             <div className="flex items-center justify-between mb-3">
@@ -346,21 +405,27 @@ export const AlgorithmArena: React.FC = () => {
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
-                <span className="text-[#A1ADC7]">Path Length:</span>
+                <span className="text-[#A1ADC7]">Path Nodes (N):</span>
                 <span className="font-mono font-bold text-[#F5F7FF]">
-                  {results.bfs?.path.length ?? 0} steps
+                  {results.bfs?.path.length ?? 0} cells
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
-                <span className="text-[#A1ADC7]">Optimal Cost:</span>
+                <span className="text-[#A1ADC7]">Movement Steps:</span>
+                <span className="font-mono font-bold text-[#6FAFFF]">
+                  {Math.max(0, (results.bfs?.path.length ?? 1) - 1)} steps
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
+                <span className="text-[#A1ADC7]">Route Cost:</span>
                 <span className="font-mono font-bold text-[#86E3B4]">
-                  {results.bfs?.totalCost ?? 0}
+                  {results.bfs?.totalCost.toFixed(1) ?? '0.0'}
                 </span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-[#A1ADC7]">Runtime:</span>
+                <span className="text-[#A1ADC7]">Runtime (Median):</span>
                 <span className="font-mono font-bold text-[#F5CF79]">
-                  {results.bfs?.executionTimeMs.toFixed(2) ?? '0.00'} ms
+                  {benchStats.bfs.median.toFixed(2)} ms (±{benchStats.bfs.variance.toFixed(2)})
                 </span>
               </div>
             </div>
@@ -368,7 +433,7 @@ export const AlgorithmArena: React.FC = () => {
         </div>
 
         {/* Visual Inspection Map */}
-        <div className="bg-[#1F2C47] rounded-2xl border border-[#2B3B5B] p-4 flex flex-col gap-3">
+        <div className="bg-[#1C2844] rounded-2xl border border-[#2B3B5B] p-4 flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-mono font-bold text-[#A1ADC7] uppercase tracking-wider">
               Visual Exploration Overlay — Inspecting: <strong className="text-[#F5F7FF] uppercase">{activeTab}</strong>
@@ -383,23 +448,23 @@ export const AlgorithmArena: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full flex items-center justify-center bg-[#17233D] rounded-xl overflow-hidden border border-[#2B3B5B]">
+          <div className="w-full flex items-center justify-center bg-[#151F36] rounded-xl overflow-hidden border border-[#2B3B5B]">
             <canvas ref={canvasRef} className="max-w-full" />
           </div>
         </div>
 
         {/* Academic DSA Synthesis */}
-        <div className="bg-[#1F2C47]/60 rounded-2xl border border-[#2B3B5B] p-6 space-y-3">
+        <div className="bg-[#1C2844]/60 rounded-2xl border border-[#2B3B5B] p-6 space-y-3">
           <h3 className="text-base font-bold text-[#F5F7FF] flex items-center gap-2">
             <Cpu className="w-4 h-4 text-[#66DAD5]" />
             Data Structures & Algorithms Theory Commentary
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-[#A1ADC7] leading-relaxed">
             <p>
-              <strong className="text-[#66DAD5]">Heuristic Search Pruning:</strong> Notice how A* expands substantially fewer nodes than Dijkstra. Because our Manhattan/Octile heuristic is <strong className="text-[#F5F7FF]">strictly admissible</strong> ($h(n) \le h^*(n)$), A* prioritizes nodes directed toward the destination, reducing exploratory node overhead while mathematically guaranteeing that the final route cost is identical to Dijkstra's optimal shortest path.
+              <strong className="text-[#66DAD5]">Heuristic Search Pruning:</strong> Because Manhattan/Octile heuristics are <strong className="text-[#F5F7FF]">strictly admissible</strong> ($h(n) \le h^*(n)$), A* prioritizes nodes directed toward the destination, reducing exploratory node overhead while mathematically guaranteeing that the final route cost is identical to Dijkstra's optimal shortest path.
             </p>
             <p>
-              <strong className="text-[#A695F2]">Dijkstra vs. BFS on Uniform Grids:</strong> On an unweighted 4-directional grid with uniform step cost $1.0$, BFS and Dijkstra find the exact same shortest path. However, Dijkstra employs a binary <code className="text-[#6FAFFF]">MinHeap</code> priority queue which incurs an $O(\log N)$ extraction overhead, whereas BFS uses an $O(1)$ FIFO queue. For weighted terrain, Dijkstra remains optimal whereas BFS minimizes edge count rather than total path cost.
+              <strong className="text-[#A695F2]">Honest Benchmark Measurement:</strong> Sub-millisecond JS execution times are subject to browser JIT optimizations, thread interleaving, and micro-task scheduling. We report the <strong className="text-[#F5F7FF]">median of 7 repeated runs</strong> alongside the observed variability range (±variance) rather than claiming artificial microsecond precision.
             </p>
           </div>
         </div>

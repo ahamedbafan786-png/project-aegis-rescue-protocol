@@ -54,6 +54,7 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
             return (
               <div
                 key={mission.id}
+                data-mission-card={mission.id}
                 onClick={() => {
                   sound.playClick();
                   onSelectMission(mission);

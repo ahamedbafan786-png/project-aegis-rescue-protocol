@@ -40,12 +40,19 @@ export function App() {
     setIsMuted(next);
   };
 
+  const handleNavigateScreen = (screen: ScreenMode) => {
+    setResultsModalOpen(false);
+    setCurrentScreen(screen);
+  };
+
   const handleSelectMission = (mission: MissionDefinition) => {
+    setResultsModalOpen(false);
     setCurrentMission(mission);
     setCurrentScreen('game');
   };
 
   const handleLaunchSandbox = () => {
+    setResultsModalOpen(false);
     // Generate a spacious sandbox mission
     const sandboxMission: MissionDefinition = {
       id: 'mission-sandbox',
@@ -114,7 +121,7 @@ export function App() {
       {/* Universal Top Navigation Header */}
       <Navbar
         currentScreen={currentScreen}
-        onSelectScreen={setCurrentScreen}
+        onSelectScreen={handleNavigateScreen}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
       />
@@ -123,7 +130,7 @@ export function App() {
       <main className="flex-1 flex overflow-hidden">
         {currentScreen === 'menu' && (
           <MainMenu
-            onSelectScreen={setCurrentScreen}
+            onSelectScreen={handleNavigateScreen}
             onLaunchSandbox={handleLaunchSandbox}
           />
         )}
@@ -139,7 +146,10 @@ export function App() {
           <GameHUD
             mission={currentMission}
             onMissionComplete={handleMissionComplete}
-            onExit={() => setCurrentScreen('missions')}
+            onExit={() => {
+              setResultsModalOpen(false);
+              setCurrentScreen('missions');
+            }}
           />
         )}
 
@@ -148,24 +158,30 @@ export function App() {
         {currentScreen === 'academy' && <AlgorithmAcademy />}
 
         {currentScreen === 'presentation' && (
-          <PresentationMode onExit={() => setCurrentScreen('menu')} />
+          <PresentationMode onExit={() => {
+            setResultsModalOpen(false);
+            setCurrentScreen('menu');
+          }} />
         )}
       </main>
 
-      {/* Mission Results Modal */}
-      <MissionResultsModal
-        isOpen={resultsModalOpen}
-        stepsTaken={latestResults.steps}
-        replansCount={latestResults.replans}
-        pathCost={latestResults.cost}
-        targetStepsForStar3={currentMission.targetStepsForStar3}
-        onReplay={() => {
-          setResultsModalOpen(false);
-          // Reloading the same mission restarts it cleanly
-          setCurrentMission({ ...currentMission });
-        }}
-        onNextMission={handleNextMission}
-      />
+      {/* Mission Results Modal — strictly isolated to active game screen */}
+      {currentScreen === 'game' && (
+        <MissionResultsModal
+          isOpen={resultsModalOpen}
+          stepsTaken={latestResults.steps}
+          replansCount={latestResults.replans}
+          pathCost={latestResults.cost}
+          targetStepsForStar3={currentMission.targetStepsForStar3}
+          onClose={() => setResultsModalOpen(false)}
+          onReplay={() => {
+            setResultsModalOpen(false);
+            // Reloading the same mission restarts it cleanly
+            setCurrentMission({ ...currentMission });
+          }}
+          onNextMission={handleNextMission}
+        />
+      )}
     </div>
   );
 }

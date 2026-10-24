@@ -261,4 +261,51 @@ describe('A* Pathfinding Engine — Mathematical Rigor & Admissibility', () => {
     expect(plan.path[0]).toEqual(currentRobotPos);
     expect(plan.path[plan.path.length - 1]).toEqual(goal);
   });
+
+  it('standardizes Path Nodes (N), Movement Steps (N-1), and Route Cost unambiguously', () => {
+    const grid = createGrid(5, 5);
+    const start = { r: 1, c: 1 };
+    const goal = { r: 1, c: 4 };
+
+    const result = findPathAStar({
+      grid,
+      rows: 5,
+      cols: 5,
+      start,
+      goal,
+      movementMode: '4-directional',
+    });
+
+    expect(result.found).toBe(true);
+    // Path contains 4 nodes: (1,1), (1,2), (1,3), (1,4)
+    expect(result.path.length).toBe(4);
+    // Number of movement steps is strictly N - 1 edges
+    const movementSteps = result.path.length - 1;
+    expect(movementSteps).toBe(3);
+    // On unweighted terrain with unit cost 1.0, total cost equals movement steps
+    expect(result.totalCost).toBe(3.0);
+  });
+
+  it('accurately distinguishes movement steps from cost on weighted terrain', () => {
+    const grid = createGrid(5, 5);
+    // Place rough terrain at (1, 2)
+    grid[1][2] = 'ROUGH_TERRAIN';
+
+    const start = { r: 1, c: 1 };
+    const goal = { r: 1, c: 3 };
+
+    const result = findPathAStar({
+      grid,
+      rows: 5,
+      cols: 5,
+      start,
+      goal,
+      movementMode: '4-directional',
+    });
+
+    expect(result.found).toBe(true);
+    // Can either detour (step cost 1 + 1 + 1 + 1 = 4) or go through rough terrain (cost 3 + 1 = 4)
+    expect(result.path.length - 1).toBeGreaterThanOrEqual(2);
+    expect(result.totalCost).toBeLessThanOrEqual(4.0);
+  });
 });

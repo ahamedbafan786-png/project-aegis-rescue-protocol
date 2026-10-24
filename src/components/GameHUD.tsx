@@ -1,31 +1,27 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   AlertOctagon,
-  AlertTriangle,
-  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Compass,
   Eraser,
   Flame,
-  Footprints,
-  Info,
-  Maximize2,
+  Layers,
   MapPin,
-  Minimize2,
   Move,
   Pause,
   Play,
   RotateCcw,
   Route,
-  Settings,
+  Settings2,
   Shuffle,
-  Sparkles,
   Square,
   StepForward,
-  Timer,
   Trash2,
+  X,
   Zap,
 } from 'lucide-react';
-import { findPathAStar, isTileBlocked } from '../algorithms/astar';
+import { findPathAStar, isTileBlocked, getTileMovementCost } from '../algorithms/astar';
 import {
   GridCoord,
   HeuristicType,
@@ -34,7 +30,7 @@ import {
   RobotState,
   TileType,
 } from '../algorithms/types';
-import { AegisRenderer } from '../game/aegisRenderer';
+import { AegisRenderer, SectorTheme } from '../game/aegisRenderer';
 import { GridModel } from '../game/gridModel';
 import { RobotController } from '../game/robotController';
 import { sound } from '../game/soundEngine';
@@ -55,6 +51,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<AegisRenderer | null>(null);
+
+  // Layout Docks (collapsible for board-centric focus)
+  const [leftDockOpen, setLeftDockOpen] = useState<boolean>(true);
+  const [rightDockOpen, setRightDockOpen] = useState<boolean>(true);
 
   // Models
   const [gridModel, setGridModel] = useState<GridModel>(() => {
@@ -88,6 +88,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     nodesExpanded: 0,
     pathCost: 0,
     pathLength: 0,
+    executedCost: 0,
+    remainingCost: 0,
+    totalMissionCost: 0,
+    stepsTaken: 0,
+    remainingSteps: 0,
     replans: 0,
     executionTimeMs: 0,
   });
@@ -96,6 +101,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const [stepSearchActive, setStepSearchActive] = useState<boolean>(false);
   const [stepSearchFrames, setStepSearchFrames] = useState<PathResult | null>(null);
   const [currentStepFrameIndex, setCurrentStepFrameIndex] = useState<number>(0);
+
+  // Configure dynamic step cost function for weighted terrain
+  useEffect(() => {
+    const robot = robotRef.current;
+    robot.stepCostFn = (from, to) => {
+      const isDiag = from.r !== to.r && from.c !== to.c;
+      const tile = gridModel.tiles[to.r][to.c];
+      const weight = getTileMovementCost(tile);
+      return isDiag ? weight * Math.SQRT2 : weight;
+    };
+  }, [gridModel]);
 
   // Run A* Calculation
   const calculatePath = useCallback(
@@ -161,7 +177,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
     // Initial Path Calculation
     const initialRes = calculatePath(gridModel.start);
-    robotRef.current.setPath(initialRes.path);
+    robotRef.current.setPath(initialRes.path, initialRes.totalCost);
 
     return () => {
       window.removeEventListener('resize', handleResize);
@@ -190,13 +206,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         onMissionComplete({
           steps: robot.stepsTaken,
           replans: robot.replansCount,
-          cost: telemetry.pathCost,
+          cost: robot.executedCost,
         });
       }
 
-      // Render Canvas
+      // Render Canvas with Sector Theme
       if (rendererRef.current) {
-        rendererRef.current.render(gridModel, robot, activePath, deltaSec);
+        rendererRef.current.render(
+          gridModel,
+          robot,
+          activePath,
+          deltaSec,
+          mission.environmentTheme || 'training'
+        );
       }
 
       // Update Live Telemetry
@@ -206,6 +228,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         r: tel.currentLogicalCoord.r,
         c: tel.currentLogicalCoord.c,
         replans: tel.replansCount,
+        stepsTaken: tel.totalStepsTaken,
+        remainingSteps: tel.remainingSteps,
+        executedCost: tel.executedCost,
+        remainingCost: tel.remainingCost,
+        totalMissionCost: tel.totalMissionCost,
       }));
 
       animId = requestAnimationFrame(loop);
@@ -213,7 +240,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
     animId = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(animId);
-  }, [gridModel, activePath, speedMultiplier, robotState, telemetry.pathCost, onMissionComplete]);
+  }, [gridModel, activePath, speedMultiplier, robotState, onMissionComplete, mission.environmentTheme]);
 
   // Handle Robot Callbacks
   useEffect(() => {
@@ -229,7 +256,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       const newPlan = calculatePath(currentValid);
 
       if (newPlan.found) {
-        robot.setPath(newPlan.path);
+        robot.setPath(newPlan.path, newPlan.totalCost);
         robot.startMoving();
       } else {
         robot.state = 'FAILED';
@@ -247,7 +274,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     if (robot.state === 'IDLE' || robot.state === 'CONFIRMED') {
       const res = calculatePath(robot.logicalPos);
       if (res.found) {
-        robot.setPath(res.path);
+        robot.setPath(res.path, res.totalCost);
         robot.startMoving();
       }
     } else if (robot.state === 'MOVING') {
@@ -256,7 +283,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       // Reset and replay
       robot.reset(gridModel.start);
       const res = calculatePath(gridModel.start);
-      robot.setPath(res.path);
+      robot.setPath(res.path, res.totalCost);
     }
   };
 
@@ -266,32 +293,50 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     const robot = robotRef.current;
     robot.reset(gridModel.start);
     const res = calculatePath(gridModel.start);
-    robot.setPath(res.path);
+    robot.setPath(res.path, res.totalCost);
     setRobotState('IDLE');
     setStatusMessage('SYSTEM STANDBY');
   };
 
-  // Dynamic Blockage Trigger (The Core Demonstration Feature)
+  // Dynamic Blockage Trigger (Reliably blocks upcoming cell on path)
   const handleTriggerBlockage = () => {
     const robot = robotRef.current;
-
-    // Pick target tile to block
-    let blockCoord: GridCoord | null = null;
-
-    if (mission.demoBlockageCoord && !isTileBlocked(gridModel.tiles[mission.demoBlockageCoord.r][mission.demoBlockageCoord.c])) {
-      blockCoord = mission.demoBlockageCoord;
-    } else if (activePath.length > robot.currentWaypointIndex + 2) {
-      // Block the waypoint 2 steps ahead of the robot's current position
-      blockCoord = activePath[robot.currentWaypointIndex + 2];
-    } else if (activePath.length > robot.currentWaypointIndex + 1) {
-      blockCoord = activePath[robot.currentWaypointIndex + 1];
+    if (robot.state !== 'MOVING' && robot.state !== 'CONFIRMED' && robot.state !== 'IDLE') {
+      return;
     }
 
-    if (!blockCoord) {
-      // Fallback: pick any open cell between robot and target
-      const midR = Math.floor((robot.logicalPos.r + gridModel.target.r) / 2);
-      const midC = Math.floor((robot.logicalPos.c + gridModel.target.c) / 2);
-      blockCoord = { r: midR, c: midC };
+    // Inspect remaining waypoints ahead of the robot
+    const remaining = robot.path.slice(robot.currentWaypointIndex + 1);
+    if (remaining.length === 0) {
+      setStatusMessage('TARGET IN REACH — NO AHEAD CELLS TO BLOCK');
+      return;
+    }
+
+    let blockCoord: GridCoord | null = null;
+
+    // Check if preset demo blockage coordinate is ahead
+    if (
+      mission.demoBlockageCoord &&
+      remaining.some(
+        (wp) => wp.r === mission.demoBlockageCoord!.r && wp.c === mission.demoBlockageCoord!.c
+      ) &&
+      !isTileBlocked(gridModel.tiles[mission.demoBlockageCoord.r][mission.demoBlockageCoord.c])
+    ) {
+      blockCoord = mission.demoBlockageCoord;
+    } else {
+      // Pick 2 steps ahead (or 1 step ahead if only 1 remaining), avoiding target cell
+      const candidateIdx = remaining.length > 2 ? 2 : (remaining.length > 1 ? 1 : 0);
+      const candidate = remaining[candidateIdx];
+      if (candidate.r !== gridModel.target.r || candidate.c !== gridModel.target.c) {
+        blockCoord = candidate;
+      } else if (remaining.length > 1) {
+        blockCoord = remaining[0];
+      }
+    }
+
+    if (!blockCoord || (blockCoord.r === gridModel.target.r && blockCoord.c === gridModel.target.c)) {
+      setStatusMessage('TARGET IN REACH — DESTINATION PROTECTED');
+      return;
     }
 
     // Place Wall directly into authoritative grid
@@ -299,13 +344,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     nextModel.setTile(blockCoord.r, blockCoord.c, 'WALL');
     setGridModel(nextModel);
 
-    rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 10);
+    // Particle dust & visual storytelling in renderer
+    rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 14);
+    rendererRef.current?.triggerBlockageVisual(blockCoord, activePath, robot.logicalPos);
 
     // Prompt robot to inspect remaining path
-    const isBlocked = robot.checkPathBlocked((r, c) => nextModel.tiles[r][c] === 'WALL' || nextModel.tiles[r][c] === 'DEBRIS');
+    const isBlocked = robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
 
-    // If robot wasn't moving yet, recalculate immediately
-    if (!isBlocked && robot.state !== 'MOVING') {
+    // If robot was idle, recalculate immediately
+    if (!isBlocked && (robot.state === 'IDLE' || robot.state === 'CONFIRMED')) {
       const res = findPathAStar({
         grid: nextModel.tiles,
         rows: nextModel.rows,
@@ -316,7 +363,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         heuristicType,
       });
       setActivePath(res.path);
-      robot.setPath(res.path);
+      robot.setPath(res.path, res.totalCost);
     }
   };
 
@@ -393,7 +440,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
     if (activeTool === 'wall') {
       changed = nextModel.setTile(coord.r, coord.c, 'WALL');
-      if (changed) rendererRef.current.addDustParticles(coord.r, coord.c, 4);
+      if (changed) rendererRef.current.addDustParticles(coord.r, coord.c, 6);
     } else if (activeTool === 'rough') {
       changed = nextModel.setTile(coord.r, coord.c, 'ROUGH_TERRAIN');
     } else if (activeTool === 'eraser') {
@@ -411,7 +458,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       // Check if robot path is invalidated while moving
       const robot = robotRef.current;
-      robot.checkPathBlocked((r, c) => nextModel.tiles[r][c] === 'WALL' || nextModel.tiles[r][c] === 'DEBRIS');
+      robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
 
       // If robot is idle, update path preview
       if (robot.state === 'IDLE' || robot.state === 'CONFIRMED') {
@@ -425,12 +472,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           heuristicType,
         });
         setActivePath(res.path);
-        robot.setPath(res.path);
+        robot.setPath(res.path, res.totalCost);
       }
     }
   };
 
-  // Keyboard Shortcuts (Space: Play/Pause, R: Reset, B: Blockage)
+  // Keyboard Shortcuts (Space: Play/Pause, R: Reset, B: Blockage, T: Tools, M: Metrics)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -442,6 +489,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       } else if (e.code === 'KeyB') {
         e.preventDefault();
         handleTriggerBlockage();
+      } else if (e.code === 'KeyT') {
+        setLeftDockOpen((v) => !v);
+      } else if (e.code === 'KeyM') {
+        setRightDockOpen((v) => !v);
       } else if (e.code === 'Digit1') {
         setActiveTool('wall');
       } else if (e.code === 'Digit2') {
@@ -455,26 +506,31 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [gridModel, activePath]);
 
+  // Determine if blockage button should be disabled
+  const canTriggerBlockage =
+    (robotState === 'MOVING' || robotState === 'CONFIRMED' || robotState === 'IDLE') &&
+    activePath.length > robotRef.current.currentWaypointIndex + 1;
+
   return (
-    <div className="flex-1 w-full bg-[#17233D] text-[#F5F7FF] flex flex-col select-none overflow-hidden">
+    <div className="flex-1 w-full bg-[#151F36] text-[#F5F7FF] flex flex-col select-none overflow-hidden">
       {/* Top Tactical Status Bar */}
-      <div className="bg-[#1F2C47] border-b border-[#2B3B5B] px-5 py-2.5 flex items-center justify-between z-20">
+      <div className="bg-[#1C2844] border-b border-[#2B3B5B] px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between z-20 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold text-[#66DAD5] uppercase tracking-wider">
+              <span className="text-[10px] sm:text-xs font-mono font-bold text-[#66DAD5] uppercase tracking-wider">
                 {mission.codename}
               </span>
-              <span className="text-sm font-bold text-[#F5F7FF]">{mission.title}</span>
+              <span className="text-xs sm:text-sm font-bold text-[#F5F7FF]">{mission.title}</span>
             </div>
-            <span className="text-[11px] text-[#A1ADC7]">{mission.subtitle}</span>
+            <span className="hidden sm:block text-[11px] text-[#A1ADC7]">{mission.subtitle}</span>
           </div>
         </div>
 
         {/* Dynamic Status Indicator */}
         <div className="flex items-center gap-2">
           <div
-            className={`px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 border shadow-sm ${
+            className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 border shadow-sm ${
               robotState === 'MOVING'
                 ? 'bg-[#86E3B4]/15 border-[#86E3B4]/40 text-[#86E3B4]'
                 : robotState === 'BLOCKED' || robotState === 'REPLANNING'
@@ -487,7 +543,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             }`}
           >
             <span
-              className={`w-2 h-2 rounded-full ${
+              className={`w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full ${
                 robotState === 'MOVING'
                   ? 'bg-[#86E3B4] animate-ping'
                   : robotState === 'BLOCKED' || robotState === 'REPLANNING'
@@ -501,221 +557,262 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
         </div>
 
-        {/* Speed Controls */}
-        <div className="flex items-center gap-1.5 bg-[#17233D] px-2 py-1 rounded-lg border border-[#2B3B5B]">
-          <span className="text-[11px] font-mono text-[#A1ADC7] mr-1.5">Speed:</span>
-          {[0.5, 1.0, 2.0, 5.0, 100].map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                sound.playClick();
-                setSpeedMultiplier(s);
-              }}
-              className={`px-2 py-0.5 rounded text-[11px] font-mono font-semibold transition-all ${
-                speedMultiplier === s
-                  ? 'bg-[#66DAD5] text-[#17233D] font-bold'
-                  : 'text-[#A1ADC7] hover:text-[#F5F7FF]'
-              }`}
-            >
-              {s === 100 ? 'Instant' : `${s}x`}
-            </button>
-          ))}
+        {/* Speed Controls & Dock Toggles */}
+        <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-1 bg-[#151F36] px-2 py-1 rounded-lg border border-[#2B3B5B]">
+            <span className="text-[10px] font-mono text-[#A1ADC7] mr-1">Speed:</span>
+            {[0.5, 1.0, 2.0, 5.0, 100].map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  sound.playClick();
+                  setSpeedMultiplier(s);
+                }}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold transition-all ${
+                  speedMultiplier === s
+                    ? 'bg-[#66DAD5] text-[#151F36] font-bold'
+                    : 'text-[#A1ADC7] hover:text-[#F5F7FF]'
+                }`}
+              >
+                {s === 100 ? 'Max' : `${s}x`}
+              </button>
+            ))}
+          </div>
+
+          {/* Dock Toggle Buttons */}
+          <button
+            onClick={() => setLeftDockOpen((v) => !v)}
+            title="Toggle Tools Panel (T)"
+            className={`p-1.5 rounded-lg border transition-colors ${
+              leftDockOpen
+                ? 'bg-[#66DAD5]/15 border-[#66DAD5]/50 text-[#66DAD5]'
+                : 'bg-[#151F36] border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+            }`}
+          >
+            <Settings2 className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={() => setRightDockOpen((v) => !v)}
+            title="Toggle Telemetry Panel (M)"
+            className={`p-1.5 rounded-lg border transition-colors ${
+              rightDockOpen
+                ? 'bg-[#6FAFFF]/15 border-[#6FAFFF]/50 text-[#6FAFFF]'
+                : 'bg-[#151F36] border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Main HUD Center Area (Grid Canvas + Left & Right Docks) */}
+      {/* Main HUD Center Area (Grid Canvas Occupies 70-75% on Desktop, 100% on Mobile) */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Toolbar Dock */}
-        <div className="w-56 bg-[#1F2C47]/95 border-r border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 z-10 overflow-y-auto">
-          <div className="flex flex-col gap-4">
-            {/* Terrain Tools */}
-            <div>
-              <span className="text-[11px] font-mono font-bold text-[#A1ADC7] tracking-wider uppercase block mb-2">
-                Terrain Tools
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
+        {/* Left Toolbar Dock (Collapsible Floating / Side Panel) */}
+        {leftDockOpen && (
+          <div className="absolute md:relative z-30 top-0 left-0 bottom-0 w-56 bg-[#1C2844]/95 backdrop-blur-md border-r border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 overflow-y-auto shadow-2xl md:shadow-none animate-in slide-in-from-left duration-200">
+            <div className="flex flex-col gap-3.5">
+              <div className="flex items-center justify-between border-b border-[#2B3B5B] pb-2">
+                <span className="text-[11px] font-mono font-bold text-[#66DAD5] tracking-wider uppercase">
+                  Tactical Tools
+                </span>
                 <button
-                  onClick={() => {
-                    sound.playClick();
-                    setActiveTool('wall');
-                  }}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all ${
-                    activeTool === 'wall'
-                      ? 'bg-[#2B3B5B] border-[#66DAD5] text-[#66DAD5] shadow-sm'
-                      : 'bg-[#17233D]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                  }`}
+                  onClick={() => setLeftDockOpen(false)}
+                  className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] md:hidden"
                 >
-                  <Square className="w-3.5 h-3.5 fill-current" />
-                  Wall (1)
-                </button>
-
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    setActiveTool('rough');
-                  }}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all ${
-                    activeTool === 'rough'
-                      ? 'bg-[#2B3B5B] border-[#F5CF79] text-[#F5CF79] shadow-sm'
-                      : 'bg-[#17233D]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                  }`}
-                >
-                  <Flame className="w-3.5 h-3.5" />
-                  Rough (2)
-                </button>
-
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    setActiveTool('eraser');
-                  }}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all ${
-                    activeTool === 'eraser'
-                      ? 'bg-[#2B3B5B] border-[#FF9B83] text-[#FF9B83] shadow-sm'
-                      : 'bg-[#17233D]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                  }`}
-                >
-                  <Eraser className="w-3.5 h-3.5" />
-                  Eraser (3)
-                </button>
-
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    setActiveTool('start');
-                  }}
-                  className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all ${
-                    activeTool === 'start'
-                      ? 'bg-[#2B3B5B] border-[#6FAFFF] text-[#6FAFFF] shadow-sm'
-                      : 'bg-[#17233D]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                  }`}
-                >
-                  <Move className="w-3.5 h-3.5" />
-                  Start
-                </button>
-
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    setActiveTool('target');
-                  }}
-                  className={`col-span-2 flex items-center justify-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all ${
-                    activeTool === 'target'
-                      ? 'bg-[#2B3B5B] border-[#86E3B4] text-[#86E3B4] shadow-sm'
-                      : 'bg-[#17233D]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                  }`}
-                >
-                  <MapPin className="w-3.5 h-3.5" />
-                  Relocate Target
+                  <X className="w-4 h-4" />
                 </button>
               </div>
-            </div>
 
-            {/* Map Generation Actions */}
-            <div>
-              <span className="text-[11px] font-mono font-bold text-[#A1ADC7] tracking-wider uppercase block mb-2">
-                Grid Presets
-              </span>
-              <div className="flex flex-col gap-1.5">
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    const next = gridModel.clone();
-                    next.generateRandomWalls(0.25);
-                    setGridModel(next);
-                    calculatePath();
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#17233D] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
-                >
-                  <Shuffle className="w-3.5 h-3.5" />
-                  Random Obstacles
-                </button>
-
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    const next = gridModel.clone();
-                    next.generateMaze();
-                    setGridModel(next);
-                    calculatePath();
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#17233D] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
-                >
-                  <Route className="w-3.5 h-3.5" />
-                  Generate Maze
-                </button>
-
-                <button
-                  onClick={() => {
-                    sound.playClick();
-                    const next = gridModel.clone();
-                    next.clearWalls();
-                    setGridModel(next);
-                    calculatePath();
-                  }}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#17233D] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  Clear Obstacles
-                </button>
-              </div>
-            </div>
-
-            {/* Heuristic & Movement Settings */}
-            <div>
-              <span className="text-[11px] font-mono font-bold text-[#A1ADC7] tracking-wider uppercase block mb-2">
-                Search Model
-              </span>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between text-xs font-medium bg-[#17233D] p-1.5 rounded-lg border border-[#2B3B5B]">
-                  <span className="text-[#A1ADC7]">Movement:</span>
+              {/* Terrain Tools */}
+              <div>
+                <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase block mb-1.5">
+                  Terrain Placement
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     onClick={() => {
                       sound.playClick();
-                      const nextMode = movementMode === '4-directional' ? '8-directional' : '4-directional';
-                      setMovementMode(nextMode);
-                      if (nextMode === '8-directional') setHeuristicType('octile');
-                      else setHeuristicType('manhattan');
+                      setActiveTool('wall');
                     }}
-                    className="font-mono text-[#66DAD5] font-semibold hover:underline"
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      activeTool === 'wall'
+                        ? 'bg-[#2B3B5B] border-[#66DAD5] text-[#66DAD5] shadow-sm'
+                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                    }`}
                   >
-                    {movementMode === '4-directional' ? '4-Way' : '8-Way'}
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    Wall (1)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setActiveTool('rough');
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      activeTool === 'rough'
+                        ? 'bg-[#2B3B5B] border-[#F5CF79] text-[#F5CF79] shadow-sm'
+                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                    }`}
+                  >
+                    <Flame className="w-3.5 h-3.5" />
+                    Rough (2)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setActiveTool('eraser');
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      activeTool === 'eraser'
+                        ? 'bg-[#2B3B5B] border-[#FF9B83] text-[#FF9B83] shadow-sm'
+                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                    }`}
+                  >
+                    <Eraser className="w-3.5 h-3.5" />
+                    Eraser (3)
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setActiveTool('start');
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      activeTool === 'start'
+                        ? 'bg-[#2B3B5B] border-[#6FAFFF] text-[#6FAFFF] shadow-sm'
+                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                    }`}
+                  >
+                    <Move className="w-3.5 h-3.5" />
+                    Start
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      setActiveTool('target');
+                    }}
+                    className={`col-span-2 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      activeTool === 'target'
+                        ? 'bg-[#2B3B5B] border-[#86E3B4] text-[#86E3B4] shadow-sm'
+                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                    }`}
+                  >
+                    <MapPin className="w-3.5 h-3.5" />
+                    Relocate Target
                   </button>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-between text-xs font-medium bg-[#17233D] p-1.5 rounded-lg border border-[#2B3B5B]">
-                  <span className="text-[#A1ADC7]">Heuristic:</span>
-                  <select
-                    value={heuristicType}
-                    onChange={(e) => {
+              {/* Map Generation Actions */}
+              <div>
+                <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase block mb-1.5">
+                  Topology Generators
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={() => {
                       sound.playClick();
-                      setHeuristicType(e.target.value as HeuristicType);
+                      const next = gridModel.clone();
+                      next.generateRandomWalls(0.25);
+                      setGridModel(next);
+                      calculatePath();
                     }}
-                    className="bg-transparent font-mono text-[#66DAD5] text-xs font-semibold focus:outline-none"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
                   >
-                    <option value="manhattan" className="bg-[#17233D] text-[#F5F7FF]">Manhattan</option>
-                    <option value="octile" className="bg-[#17233D] text-[#F5F7FF]">Octile</option>
-                    <option value="euclidean" className="bg-[#17233D] text-[#F5F7FF]">Euclidean</option>
-                  </select>
+                    <Shuffle className="w-3.5 h-3.5" />
+                    Random Obstacles
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      const next = gridModel.clone();
+                      next.generateMaze();
+                      setGridModel(next);
+                      calculatePath();
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
+                  >
+                    <Route className="w-3.5 h-3.5" />
+                    Generate Maze
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      sound.playClick();
+                      const next = gridModel.clone();
+                      next.clearWalls();
+                      setGridModel(next);
+                      calculatePath();
+                    }}
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Clear Obstacles
+                  </button>
+                </div>
+              </div>
+
+              {/* Heuristic & Movement Settings */}
+              <div>
+                <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase block mb-1.5">
+                  Search Model
+                </span>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-xs font-medium bg-[#151F36] p-1.5 rounded-lg border border-[#2B3B5B]">
+                    <span className="text-[#A1ADC7]">Movement:</span>
+                    <button
+                      onClick={() => {
+                        sound.playClick();
+                        const nextMode = movementMode === '4-directional' ? '8-directional' : '4-directional';
+                        setMovementMode(nextMode);
+                        if (nextMode === '8-directional') setHeuristicType('octile');
+                        else setHeuristicType('manhattan');
+                      }}
+                      className="font-mono text-[#66DAD5] font-semibold hover:underline"
+                    >
+                      {movementMode === '4-directional' ? '4-Way' : '8-Way'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs font-medium bg-[#151F36] p-1.5 rounded-lg border border-[#2B3B5B]">
+                    <span className="text-[#A1ADC7]">Heuristic:</span>
+                    <select
+                      value={heuristicType}
+                      onChange={(e) => {
+                        sound.playClick();
+                        setHeuristicType(e.target.value as HeuristicType);
+                      }}
+                      className="bg-transparent font-mono text-[#66DAD5] text-xs font-semibold focus:outline-none"
+                    >
+                      <option value="manhattan" className="bg-[#151F36] text-[#F5F7FF]">Manhattan</option>
+                      <option value="octile" className="bg-[#151F36] text-[#F5F7FF]">Octile</option>
+                      <option value="euclidean" className="bg-[#151F36] text-[#F5F7FF]">Euclidean</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Exit mission button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                onExit();
+              }}
+              className="w-full text-center text-xs text-[#A1ADC7] hover:text-[#F5F7FF] py-2 border-t border-[#2B3B5B] mt-3"
+            >
+              ← Mission Select
+            </button>
           </div>
+        )}
 
-          {/* Return button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onExit();
-            }}
-            className="w-full text-center text-xs text-[#A1ADC7] hover:text-[#F5F7FF] py-2 border-t border-[#2B3B5B] mt-4"
-          >
-            ← Return to Mission Select
-          </button>
-        </div>
-
-        {/* Center Canvas Viewport */}
-        <div className="flex-1 h-full bg-[#17233D] flex items-center justify-center relative overflow-hidden">
+        {/* Center Canvas Viewport (The Hero Element) */}
+        <div className="flex-1 h-full bg-[#151F36] flex items-center justify-center relative overflow-hidden">
           <canvas
             ref={canvasRef}
             onMouseDown={handleCanvasMouseDown}
@@ -724,110 +821,154 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             onMouseLeave={handleCanvasMouseUp}
             className="w-full h-full cursor-crosshair"
           />
+
+          {/* Quick Floating Docks Pills when collapsed */}
+          {!leftDockOpen && (
+            <button
+              onClick={() => setLeftDockOpen(true)}
+              className="absolute top-3 left-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#66DAD5] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              <span>Tools [T]</span>
+            </button>
+          )}
+
+          {!rightDockOpen && (
+            <button
+              onClick={() => setRightDockOpen(true)}
+              className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#6FAFFF] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Telemetry [M]</span>
+            </button>
+          )}
         </div>
 
-        {/* Right Telemetry Dock */}
-        <div className="w-64 bg-[#1F2C47]/95 border-l border-[#2B3B5B] p-4 flex flex-col justify-between shrink-0 z-10 overflow-y-auto">
-          <div className="flex flex-col gap-4">
-            {/* Live Algorithm Math Card */}
-            <div className="bg-[#17233D] rounded-xl p-3.5 border border-[#2B3B5B]">
-              <span className="text-[11px] font-mono font-bold text-[#66DAD5] tracking-wider uppercase block mb-1">
-                A* Cost Formula
-              </span>
-              <div className="text-center py-2 bg-[#202C49] rounded-lg border border-[#2B3B5B]/80 font-mono text-sm font-bold text-[#F5F7FF]">
-                f(n) = g(n) + h(n)
+        {/* Right Telemetry Dock (Collapsible Floating / Side Panel) */}
+        {rightDockOpen && (
+          <div className="absolute md:relative z-30 top-0 right-0 bottom-0 w-60 bg-[#1C2844]/95 backdrop-blur-md border-l border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 overflow-y-auto shadow-2xl md:shadow-none animate-in slide-in-from-right duration-200">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-[#2B3B5B] pb-2">
+                <span className="text-[11px] font-mono font-bold text-[#6FAFFF] tracking-wider uppercase">
+                  A* Telemetry
+                </span>
+                <button
+                  onClick={() => setRightDockOpen(false)}
+                  className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] md:hidden"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="grid grid-cols-3 gap-2 mt-3 text-center">
-                <div className="bg-[#17233D] p-1.5 rounded border border-[#2B3B5B]">
-                  <span className="text-[10px] text-[#A1ADC7] block">g(n)</span>
-                  <span className="text-xs font-mono font-bold text-[#6FAFFF]">
-                    {telemetry.g.toFixed(1)}
+
+              {/* Live Algorithm Math Card */}
+              <div className="bg-[#151F36] rounded-xl p-2.5 border border-[#2B3B5B]">
+                <span className="text-[10px] font-mono font-bold text-[#66DAD5] uppercase block mb-1">
+                  A* Cost Breakdown
+                </span>
+                <div className="text-center py-1.5 bg-[#1C2844] rounded-lg border border-[#2B3B5B]/80 font-mono text-xs font-bold text-[#F5F7FF]">
+                  f(n) = g(n) + h(n)
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 mt-2 text-center">
+                  <div className="bg-[#151F36] p-1 rounded border border-[#2B3B5B]">
+                    <span className="text-[9px] text-[#A1ADC7] block">g(n)</span>
+                    <span className="text-xs font-mono font-bold text-[#6FAFFF]">
+                      {telemetry.g.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="bg-[#151F36] p-1 rounded border border-[#2B3B5B]">
+                    <span className="text-[9px] text-[#A1ADC7] block">h(n)</span>
+                    <span className="text-xs font-mono font-bold text-[#A695F2]">
+                      {telemetry.h.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="bg-[#151F36] p-1 rounded border border-[#66DAD5]/40">
+                    <span className="text-[9px] text-[#66DAD5] font-semibold block">f(n)</span>
+                    <span className="text-xs font-mono font-bold text-[#66DAD5]">
+                      {telemetry.f.toFixed(1)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Standardized Metrics Cards */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase">
+                  Mission Progression
+                </span>
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
+                  <span className="text-[#A1ADC7]">Movement Steps:</span>
+                  <span className="font-mono font-bold text-[#F5F7FF]">
+                    {telemetry.stepsTaken}
                   </span>
                 </div>
-                <div className="bg-[#17233D] p-1.5 rounded border border-[#2B3B5B]">
-                  <span className="text-[10px] text-[#A1ADC7] block">h(n)</span>
-                  <span className="text-xs font-mono font-bold text-[#A695F2]">
-                    {telemetry.h.toFixed(1)}
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
+                  <span className="text-[#A1ADC7]">Traversed Cost:</span>
+                  <span className="font-mono font-bold text-[#86E3B4]">
+                    {telemetry.executedCost.toFixed(2)}
                   </span>
                 </div>
-                <div className="bg-[#17233D] p-1.5 rounded border border-[#66DAD5]/40">
-                  <span className="text-[10px] text-[#66DAD5] font-semibold block">f(n)</span>
-                  <span className="text-xs font-mono font-bold text-[#66DAD5]">
-                    {telemetry.f.toFixed(1)}
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
+                  <span className="text-[#A1ADC7]">Remaining Cost:</span>
+                  <span className="font-mono font-bold text-[#F5CF79]">
+                    {telemetry.remainingCost.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#66DAD5]/30 flex items-center justify-between text-xs">
+                  <span className="text-[#66DAD5] font-semibold">Total Route Cost:</span>
+                  <span className="font-mono font-bold text-[#66DAD5]">
+                    {telemetry.totalMissionCost.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
+                  <span className="text-[#A1ADC7]">Nodes Explored:</span>
+                  <span className="font-mono font-bold text-[#A695F2]">
+                    {telemetry.nodesExpanded}
+                  </span>
+                </div>
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
+                  <span className="text-[#A1ADC7]">Replans:</span>
+                  <span className="font-mono font-bold text-[#FF9B83]">
+                    {telemetry.replans}
+                  </span>
+                </div>
+
+                <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
+                  <span className="text-[#A1ADC7]">Search Time:</span>
+                  <span className="font-mono font-bold text-[#A1ADC7]">
+                    {telemetry.executionTimeMs.toFixed(2)} ms
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Mission Statistics */}
-            <div className="flex flex-col gap-2">
-              <span className="text-[11px] font-mono font-bold text-[#A1ADC7] tracking-wider uppercase">
-                Telemetry Metrics
-              </span>
-
-              <div className="bg-[#17233D] p-2.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                <span className="text-[#A1ADC7]">Robot Position:</span>
-                <span className="font-mono font-bold text-[#F5F7FF]">
-                  ({telemetry.r}, {telemetry.c})
-                </span>
-              </div>
-
-              <div className="bg-[#17233D] p-2.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                <span className="text-[#A1ADC7]">Nodes Explored:</span>
-                <span className="font-mono font-bold text-[#66DAD5]">
-                  {telemetry.nodesExpanded}
-                </span>
-              </div>
-
-              <div className="bg-[#17233D] p-2.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                <span className="text-[#A1ADC7]">Path Length:</span>
-                <span className="font-mono font-bold text-[#6FAFFF]">
-                  {telemetry.pathLength} tiles
-                </span>
-              </div>
-
-              <div className="bg-[#17233D] p-2.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                <span className="text-[#A1ADC7]">Total Cost:</span>
-                <span className="font-mono font-bold text-[#86E3B4]">
-                  {telemetry.pathCost.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="bg-[#17233D] p-2.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                <span className="text-[#A1ADC7]">Replans Triggered:</span>
-                <span className="font-mono font-bold text-[#FF9B83]">
-                  {telemetry.replans}
-                </span>
-              </div>
-
-              <div className="bg-[#17233D] p-2.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                <span className="text-[#A1ADC7]">Search Runtime:</span>
-                <span className="font-mono font-bold text-[#F5CF79]">
-                  {telemetry.executionTimeMs.toFixed(2)} ms
-                </span>
-              </div>
+            {/* Quick Shortcuts Info */}
+            <div className="text-[10px] text-[#A1ADC7]/70 font-mono mt-3 pt-2 border-t border-[#2B3B5B] flex flex-col gap-0.5">
+              <span>[Space] Deploy/Pause</span>
+              <span>[B] Dynamic Blockage</span>
+              <span>[R] Reset Simulation</span>
+              <span>[T] Toggle Tools</span>
+              <span>[M] Toggle Metrics</span>
             </div>
           </div>
-
-          {/* Quick Shortcuts Info */}
-          <div className="text-[10px] text-[#A1ADC7]/70 font-mono mt-4 pt-3 border-t border-[#2B3B5B] flex flex-col gap-1">
-            <span>[Space] Deploy / Pause</span>
-            <span>[R] Reset Simulation</span>
-            <span>[B] Trigger Blockage</span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Bottom Command Action Deck */}
-      <div className="bg-[#1F2C47] border-t border-[#2B3B5B] px-6 py-3 flex flex-wrap items-center justify-between gap-4 z-20">
-        <div className="flex items-center gap-3">
+      <div className="bg-[#1C2844] border-t border-[#2B3B5B] px-4 sm:px-6 py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-3 z-20 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Main Deploy / Pause Button */}
           <button
             onClick={handleToggleDeploy}
-            className={`px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg transition-all ${
+            className={`px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg transition-all ${
               robotState === 'MOVING'
-                ? 'bg-[#F5CF79] text-[#17233D] hover:bg-[#F5CF79]/90'
-                : 'bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] text-[#17233D] shadow-[#66DAD5]/25 hover:scale-[1.02] active:scale-[0.98]'
+                ? 'bg-[#F5CF79] text-[#151F36] hover:bg-[#F5CF79]/90'
+                : 'bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] text-[#151F36] shadow-[#66DAD5]/25 hover:scale-[1.02] active:scale-[0.98]'
             }`}
           >
             {robotState === 'MOVING' ? (
@@ -851,32 +992,43 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {/* Step Forward (Teaching Mode) */}
           <button
             onClick={handleStepForward}
-            className="px-3.5 py-2.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-xs tracking-wide flex items-center gap-1.5 transition-all"
+            className="px-3 py-2 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-xs tracking-wide flex items-center gap-1.5 transition-all"
             title="Advance search visualization by one node"
           >
-            <StepForward className="w-4 h-4 text-[#A695F2]" />
-            Step Search
+            <StepForward className="w-3.5 h-3.5 text-[#A695F2]" />
+            <span className="hidden sm:inline">Step Search</span>
           </button>
 
           {/* Reset Button */}
           <button
             onClick={handleReset}
-            className="px-3.5 py-2.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-xs tracking-wide flex items-center gap-1.5 transition-all"
+            className="px-3 py-2 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-xs tracking-wide flex items-center gap-1.5 transition-all"
+            title="Reset simulation to initial state"
           >
-            <RotateCcw className="w-4 h-4 text-[#A1ADC7]" />
-            Reset
+            <RotateCcw className="w-3.5 h-3.5 text-[#A1ADC7]" />
+            <span className="hidden sm:inline">Reset</span>
           </button>
         </div>
 
         {/* WOW Feature: Trigger Mid-Transit Blockage */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={handleTriggerBlockage}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#17233D] font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-[#FF9B83]/30 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 border border-[#FF9B83]"
-            title="Drop an obstacle directly onto the active path to trigger real-time dynamic replanning"
+            disabled={!canTriggerBlockage}
+            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 border transition-all ${
+              canTriggerBlockage
+                ? 'bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#151F36] shadow-[#FF9B83]/30 border-[#FF9B83] hover:scale-[1.02] active:scale-[0.98]'
+                : 'bg-[#2B3B5B]/50 border-[#3E527D]/50 text-[#A1ADC7]/60 cursor-not-allowed'
+            }`}
+            title={
+              canTriggerBlockage
+                ? 'Drop an obstacle on an upcoming path cell to demonstrate real-time A* dynamic replanning'
+                : 'No ahead path cells available to block'
+            }
           >
             <AlertOctagon className="w-4 h-4" />
-            Trigger Blockage (Dynamic Replanning)
+            <span>Trigger Blockage</span>
+            <span className="hidden md:inline">(Dynamic Replanning)</span>
           </button>
         </div>
       </div>

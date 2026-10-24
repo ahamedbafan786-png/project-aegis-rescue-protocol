@@ -10,6 +10,10 @@ export interface RobotTelemetry {
   state: RobotState;
   remainingSteps: number;
   totalStepsTaken: number;
+  executedCost: number;
+  remainingCost: number;
+  initialPlannedCost: number;
+  totalMissionCost: number;
   replansCount: number;
   statusMessage: string;
 }
@@ -29,7 +33,13 @@ export class RobotController {
 
   public replansCount: number = 0;
   public stepsTaken: number = 0;
+  public executedCost: number = 0;
+  public remainingCost: number = 0;
+  public initialPlannedCost: number = 0;
   public statusMessage: string = 'SYSTEM STANDBY';
+
+  // Dynamic step cost callback for weighted/diagonal terrain
+  public stepCostFn?: (from: GridCoord, to: GridCoord) => number;
 
   // Callbacks
   public onStateChange?: (state: RobotState, msg: string) => void;
@@ -54,11 +64,14 @@ export class RobotController {
     this.transitionProgress = 0;
     this.replansCount = 0;
     this.stepsTaken = 0;
+    this.executedCost = 0;
+    this.remainingCost = 0;
+    this.initialPlannedCost = 0;
     this.statusMessage = 'SYSTEM STANDBY';
     this.onStateChange?.(this.state, this.statusMessage);
   }
 
-  public setPath(newPath: GridCoord[]): void {
+  public setPath(newPath: GridCoord[], routeCost?: number): void {
     if (newPath.length === 0) {
       this.state = 'FAILED';
       this.statusMessage = 'NO SAFE ROUTE AVAILABLE';
@@ -70,6 +83,13 @@ export class RobotController {
     this.path = [...newPath];
     this.currentWaypointIndex = 0;
     this.transitionProgress = 0;
+
+    const cost = routeCost ?? Math.max(0, newPath.length - 1);
+    if (this.stepsTaken === 0) {
+      this.initialPlannedCost = cost;
+    }
+    this.remainingCost = cost;
+
     this.state = 'CONFIRMED';
     this.statusMessage = 'ROUTE LOCKED — READY TO DEPLOY';
     sound.playRouteFound();
@@ -153,6 +173,15 @@ export class RobotController {
 
     // Instant mode
     if (speedMultiplier >= 100) {
+      while (this.currentWaypointIndex < this.path.length - 1) {
+        const cur = this.path[this.currentWaypointIndex];
+        const nxt = this.path[this.currentWaypointIndex + 1];
+        const cost = this.stepCostFn ? this.stepCostFn(cur, nxt) : 1.0;
+        this.executedCost += cost;
+        this.stepsTaken++;
+        this.currentWaypointIndex++;
+      }
+      this.remainingCost = 0;
       const finalWp = this.path[this.path.length - 1];
       this.logicalPos = { ...finalWp };
       this.visualX = finalWp.c;
@@ -189,6 +218,9 @@ export class RobotController {
     if (this.transitionProgress >= 1.0) {
       // Completed step to next waypoint
       this.transitionProgress = 0;
+      const cost = this.stepCostFn ? this.stepCostFn(currentWp, nextWp) : 1.0;
+      this.executedCost += cost;
+      this.remainingCost = Math.max(0, this.remainingCost - cost);
       this.currentWaypointIndex++;
       this.logicalPos = { ...nextWp };
       this.visualX = nextWp.c;
@@ -198,6 +230,7 @@ export class RobotController {
 
       // Check if this was the final waypoint
       if (this.currentWaypointIndex >= this.path.length - 1) {
+        this.remainingCost = 0;
         this.state = 'ARRIVED';
         this.statusMessage = 'RESCUE COMPLETE';
         sound.playVictory();
@@ -227,6 +260,10 @@ export class RobotController {
       state: this.state,
       remainingSteps: Math.max(0, this.path.length - 1 - this.currentWaypointIndex),
       totalStepsTaken: this.stepsTaken,
+      executedCost: this.executedCost,
+      remainingCost: this.remainingCost,
+      initialPlannedCost: this.initialPlannedCost,
+      totalMissionCost: this.executedCost + this.remainingCost,
       replansCount: this.replansCount,
       statusMessage: this.statusMessage,
     };
