@@ -14,7 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { findPathAStar, isTileBlocked, getTileMovementCost } from '../algorithms/astar';
-import { GridCoord, RobotState } from '../algorithms/types';
+import { GridCoord, RobotState, TileType } from '../algorithms/types';
 import { AegisRenderer } from '../game/aegisRenderer';
 import { GridModel } from '../game/gridModel';
 import { RobotController } from '../game/robotController';
@@ -37,6 +37,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     mission.initialWalls.forEach((w) => model.setTile(w.r, w.c, 'WALL'));
     return model;
   });
+  // Maintain an authoritative mutable ref to prevent stale grid closures during synchronous replanning
+  const gridModelRef = useRef<GridModel>(gridModel);
+  gridModelRef.current = gridModel;
 
   const robotRef = useRef<RobotController>(new RobotController(mission.start));
 
@@ -64,20 +67,21 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     const robot = robotRef.current;
     robot.stepCostFn = (from, to) => {
       const isDiag = from.r !== to.r && from.c !== to.c;
-      const tile = gridModel.tiles[to.r][to.c];
+      const tile = gridModelRef.current.tiles[to.r][to.c];
       const weight = getTileMovementCost(tile);
       return isDiag ? weight * Math.SQRT2 : weight;
     };
-  }, [gridModel]);
+  }, []);
 
-  // Calculate Initial Path
-  const computeRoute = (startCoord: GridCoord) => {
+  // Calculate Initial / Replanned Path
+  const computeRoute = (startCoord: GridCoord, gridOverride?: TileType[][]) => {
+    const currentTiles = gridOverride || gridModelRef.current.tiles;
     const res = findPathAStar({
-      grid: gridModel.tiles,
-      rows: gridModel.rows,
-      cols: gridModel.cols,
+      grid: currentTiles,
+      rows: gridModelRef.current.rows,
+      cols: gridModelRef.current.cols,
       start: startCoord,
-      goal: gridModel.target,
+      goal: gridModelRef.current.target,
       movementMode: '4-directional',
       heuristicType: 'manhattan',
     });
@@ -178,9 +182,10 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
 
     robot.onBlocked = () => {
       const currentValid = robot.logicalPos;
-      const newPlan = computeRoute(currentValid);
+      const newPlan = computeRoute(currentValid, gridModelRef.current.tiles);
 
       if (newPlan.found) {
+        setActivePath(newPlan.path);
         robot.setPath(newPlan.path, newPlan.totalCost);
         robot.startMoving();
       } else {
@@ -191,7 +196,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         sound.playFailed();
       }
     };
-  }, [gridModel]);
+  }, []);
 
   const handleDeploy = () => {
     sound.playClick();
@@ -211,6 +216,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     sound.playClick();
     const next = new GridModel(mission.rows, mission.cols, mission.start, mission.target);
     mission.initialWalls.forEach((w) => next.setTile(w.r, w.c, 'WALL'));
+    gridModelRef.current = next;
     setGridModel(next);
 
     const robot = robotRef.current;
@@ -251,27 +257,29 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
       remaining.some(
         (wp) => wp.r === mission.demoBlockageCoord!.r && wp.c === mission.demoBlockageCoord!.c
       ) &&
-      !isTileBlocked(gridModel.tiles[mission.demoBlockageCoord.r][mission.demoBlockageCoord.c])
+      !isTileBlocked(gridModelRef.current.tiles[mission.demoBlockageCoord.r][mission.demoBlockageCoord.c])
     ) {
       blockCoord = mission.demoBlockageCoord;
     } else {
       // Pick 2 steps ahead (or 1 step ahead), avoiding goal destination
       const candidateIdx = remaining.length > 2 ? 2 : (remaining.length > 1 ? 1 : 0);
       const candidate = remaining[candidateIdx];
-      if (candidate.r !== gridModel.target.r || candidate.c !== gridModel.target.c) {
+      if (candidate.r !== gridModelRef.current.target.r || candidate.c !== gridModelRef.current.target.c) {
         blockCoord = candidate;
       } else if (remaining.length > 1) {
         blockCoord = remaining[0];
       }
     }
 
-    if (!blockCoord || (blockCoord.r === gridModel.target.r && blockCoord.c === gridModel.target.c)) {
+    if (!blockCoord || (blockCoord.r === gridModelRef.current.target.r && blockCoord.c === gridModelRef.current.target.c)) {
       setStatusMessage('TARGET REACHED — CANNOT BLOCK DESTINATION');
       return;
     }
 
-    const nextModel = gridModel.clone();
+    const nextModel = gridModelRef.current.clone();
     nextModel.setTile(blockCoord.r, blockCoord.c, 'WALL');
+    // Crucial: immediately update gridModelRef synchronously before invoking checkPathBlocked
+    gridModelRef.current = nextModel;
     setGridModel(nextModel);
 
     // Particle dust & visual storytelling in renderer
@@ -301,7 +309,13 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   let statusBadgeDot = 'bg-[#66DAD5]';
   let displayStatus = statusMessage;
 
-  if (isInDemoWindow) {
+  if (robotState === 'ARRIVED') {
+    statusBadgeColor = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4]';
+    statusBadgeDot = 'bg-[#86E3B4]';
+    displayStatus = isDetourActive
+      ? 'RESCUE COMPLETE · DETOUR SUCCESSFUL'
+      : 'RESCUE COMPLETE · DESTINATION REACHED';
+  } else if (isInDemoWindow) {
     statusBadgeColor = 'bg-[#86E3B4]/25 border-[#86E3B4] text-[#86E3B4] animate-pulse';
     statusBadgeDot = 'bg-[#86E3B4] animate-ping';
     displayStatus = 'DEMO READY: TRIGGER COLLAPSE NOW';
@@ -312,9 +326,6 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   } else if (robotState === 'BLOCKED' || robotState === 'REPLANNING') {
     statusBadgeColor = 'bg-[#FF9B83]/25 border-[#FF9B83]/80 text-[#FF9B83] animate-pulse';
     statusBadgeDot = 'bg-[#FF9B83]';
-  } else if (robotState === 'ARRIVED') {
-    statusBadgeColor = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4]';
-    statusBadgeDot = 'bg-[#86E3B4]';
   } else if (robotState === 'MOVING') {
     statusBadgeColor = 'bg-[#6FAFFF]/20 border-[#6FAFFF]/60 text-[#6FAFFF]';
     statusBadgeDot = 'bg-[#6FAFFF] animate-ping';
@@ -331,7 +342,17 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   let triggerButtonDisabled = true;
   let triggerButtonTitle = 'Deploy Aegis-1 first, then trigger collapse during demo window';
 
-  if (isInDemoWindow) {
+  if (robotState === 'ARRIVED') {
+    triggerButtonDisabled = true;
+    triggerButtonClass = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4] cursor-default';
+    triggerButtonTitle = 'Demonstration complete! Click Replay to run again.';
+    triggerButtonContent = (
+      <>
+        <Sparkles className="w-4 h-4 text-[#86E3B4]" />
+        <span>DEMO COMPLETE</span>
+      </>
+    );
+  } else if (isInDemoWindow) {
     triggerButtonDisabled = false;
     triggerButtonClass =
       'bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#151F36] shadow-lg shadow-[#FF9B83]/40 border-[#FF9B83] animate-pulse hover:scale-[1.03] active:scale-[0.97]';
@@ -343,7 +364,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         <span>TRIGGER COLLAPSE NOW</span>
       </>
     );
-  } else if (isDetourActive) {
+  } else if (isDetourActive && robotState === 'MOVING') {
     triggerButtonDisabled = true;
     triggerButtonClass = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4] cursor-default';
     triggerButtonTitle = 'A* has successfully replanned around the collapse!';
@@ -472,6 +493,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
           {/* Main Action Button */}
           <button
             onClick={handleDeploy}
+            data-deploy-button
             className="px-4 sm:px-7 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] hover:from-[#5bc7c2] hover:to-[#5ea0ee] text-[#151F36] font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 shadow-xl shadow-[#66DAD5]/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             {robotState === 'MOVING' ? (
@@ -540,6 +562,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
             onClick={handleTriggerBlockage}
             disabled={triggerButtonDisabled}
             title={triggerButtonTitle}
+            data-trigger-blockage
             className={`px-3.5 sm:px-6 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 border transition-all ${triggerButtonClass}`}
           >
             {triggerButtonContent}

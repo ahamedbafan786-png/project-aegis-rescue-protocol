@@ -1,5 +1,6 @@
 import {
   coordKey,
+  getTileMovementCost,
   isTileBlocked,
   parseKey,
 } from './astar';
@@ -162,7 +163,17 @@ export function findPathBFS(options: BFSOptions): PathResult {
       path.unshift(curr);
       curr = parentMap.get(coordKey(curr));
     }
-    totalCost = hopMap[coordKey(goal)] ?? 0;
+    // Evaluate the true traversal route cost using the active movement-cost model.
+    // BFS minimizes unweighted hops (FIFO), but its returned totalCost must reflect
+    // the actual traversal cost of the discovered route across weighted terrain.
+    totalCost = 0;
+    for (let i = 1; i < path.length; i++) {
+      const from = path[i - 1];
+      const to = path[i];
+      const isDiag = from.r !== to.r && from.c !== to.c;
+      const baseCost = getTileMovementCost(grid[to.r][to.c]);
+      totalCost += isDiag ? baseCost * Math.SQRT2 : baseCost;
+    }
   }
 
   const executionTimeMs = performance.now() - startTime;

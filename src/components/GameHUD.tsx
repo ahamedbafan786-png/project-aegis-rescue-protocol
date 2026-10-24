@@ -54,10 +54,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<AegisRenderer | null>(null);
 
-  // Layout Docks (collapsible for board-centric focus, default closed on mobile < 1024px)
+  // Layout Docks: authoritative single-state drawer exclusivity ('CLOSED' | 'TOOLS' | 'TELEMETRY')
+  // Eliminates race conditions and drawer overlap on mobile (390x844 & 543x589)
+  type ActiveDrawer = 'CLOSED' | 'TOOLS' | 'TELEMETRY';
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
-  const [leftDockOpen, setLeftDockOpen] = useState<boolean>(!isMobile);
-  const [rightDockOpen, setRightDockOpen] = useState<boolean>(false);
+  const [activeDrawer, setActiveDrawer] = useState<ActiveDrawer>(() => (isMobile ? 'CLOSED' : 'TOOLS'));
+
+  const leftDockOpen = activeDrawer === 'TOOLS';
+  const rightDockOpen = activeDrawer === 'TELEMETRY';
   const [analysisModalOpen, setAnalysisModalOpen] = useState<boolean>(false);
 
   // Models
@@ -67,6 +71,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     mission.initialRoughTerrain?.forEach((t) => model.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
     return model;
   });
+  const gridModelRef = useRef<GridModel>(gridModel);
+  gridModelRef.current = gridModel;
 
   const robotRef = useRef<RobotController>(new RobotController(mission.start));
 
@@ -111,22 +117,23 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     const robot = robotRef.current;
     robot.stepCostFn = (from, to) => {
       const isDiag = from.r !== to.r && from.c !== to.c;
-      const tile = gridModel.tiles[to.r][to.c];
+      const tile = gridModelRef.current.tiles[to.r][to.c];
       const weight = getTileMovementCost(tile);
       return isDiag ? weight * Math.SQRT2 : weight;
     };
-  }, [gridModel]);
+  }, []);
 
   // Run A* Calculation
   const calculatePath = useCallback(
-    (startCoord?: GridCoord) => {
+    (startCoord?: GridCoord, gridOverride?: TileType[][]) => {
       const from = startCoord || robotRef.current.logicalPos;
+      const currentTiles = gridOverride || gridModelRef.current.tiles;
       const res = findPathAStar({
-        grid: gridModel.tiles,
-        rows: gridModel.rows,
-        cols: gridModel.cols,
+        grid: currentTiles,
+        rows: gridModelRef.current.rows,
+        cols: gridModelRef.current.cols,
         start: from,
-        goal: gridModel.target,
+        goal: gridModelRef.current.target,
         movementMode,
         heuristicType,
         recordSteps: true,
@@ -158,7 +165,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       return res;
     },
-    [gridModel, movementMode, heuristicType]
+    [movementMode, heuristicType]
   );
 
   // Initialize Canvas & Renderer
@@ -257,9 +264,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     robot.onBlocked = () => {
       // Dynamic Replanning Triggered!
       const currentValid = robot.logicalPos;
-      const newPlan = calculatePath(currentValid);
+      const newPlan = calculatePath(currentValid, gridModelRef.current.tiles);
 
       if (newPlan.found) {
+        setActivePath(newPlan.path);
         robot.setPath(newPlan.path, newPlan.totalCost);
         robot.startMoving();
       } else {
@@ -277,8 +285,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     const robot = robotRef.current;
     if (robot.state === 'IDLE' || robot.state === 'CONFIRMED') {
       if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-        setLeftDockOpen(false);
-        setRightDockOpen(false);
+        setActiveDrawer('CLOSED');
       }
       const res = calculatePath(robot.logicalPos);
       if (res.found) {
@@ -350,14 +357,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       }
     }
 
-    if (!blockCoord || (blockCoord.r === gridModel.target.r && blockCoord.c === gridModel.target.c)) {
+    if (!blockCoord || (blockCoord.r === gridModelRef.current.target.r && blockCoord.c === gridModelRef.current.target.c)) {
       setStatusMessage('TARGET IN REACH — DESTINATION PROTECTED');
       return;
     }
 
     // Place Wall directly into authoritative grid
-    const nextModel = gridModel.clone();
+    const nextModel = gridModelRef.current.clone();
     nextModel.setTile(blockCoord.r, blockCoord.c, 'WALL');
+    gridModelRef.current = nextModel;
     setGridModel(nextModel);
 
     // Particle dust & visual storytelling in renderer
@@ -507,18 +515,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         handleTriggerBlockage();
       } else if (e.code === 'KeyT') {
         sound.playClick();
-        setLeftDockOpen((prev) => {
-          const next = !prev;
-          if (next && typeof window !== 'undefined' && window.innerWidth < 1024) setRightDockOpen(false);
-          return next;
-        });
+        setActiveDrawer((prev) => (prev === 'TOOLS' ? 'CLOSED' : 'TOOLS'));
       } else if (e.code === 'KeyM') {
         sound.playClick();
-        setRightDockOpen((prev) => {
-          const next = !prev;
-          if (next && typeof window !== 'undefined' && window.innerWidth < 1024) setLeftDockOpen(false);
-          return next;
-        });
+        setActiveDrawer((prev) => (prev === 'TELEMETRY' ? 'CLOSED' : 'TELEMETRY'));
       } else if (e.code === 'Digit1') {
         setActiveTool('wall');
       } else if (e.code === 'Digit2') {
@@ -607,7 +607,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           {/* Dock Toggle Buttons */}
           <button
-            onClick={() => setLeftDockOpen((v) => !v)}
+            onClick={() => {
+              sound.playClick();
+              setActiveDrawer((prev) => (prev === 'TOOLS' ? 'CLOSED' : 'TOOLS'));
+            }}
             title="Toggle Tools Panel (T)"
             className={`p-1.5 rounded-lg border transition-colors ${
               leftDockOpen
@@ -619,7 +622,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </button>
 
           <button
-            onClick={() => setRightDockOpen((v) => !v)}
+            onClick={() => {
+              sound.playClick();
+              setActiveDrawer((prev) => (prev === 'TELEMETRY' ? 'CLOSED' : 'TELEMETRY'));
+            }}
             title="Toggle Telemetry Panel (M)"
             className={`p-1.5 rounded-lg border transition-colors ${
               rightDockOpen
@@ -643,7 +649,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   Tactical Tools
                 </span>
                 <button
-                  onClick={() => setLeftDockOpen(false)}
+                  onClick={() => setActiveDrawer('CLOSED')}
                   className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] lg:hidden"
                 >
                   <X className="w-4 h-4" />
@@ -853,8 +859,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <button
               onClick={() => {
                 sound.playClick();
-                if (typeof window !== 'undefined' && window.innerWidth < 1024) setRightDockOpen(false);
-                setLeftDockOpen(true);
+                setActiveDrawer('TOOLS');
               }}
               className="absolute top-3 left-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#66DAD5] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
             >
@@ -867,8 +872,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             <button
               onClick={() => {
                 sound.playClick();
-                if (typeof window !== 'undefined' && window.innerWidth < 1024) setLeftDockOpen(false);
-                setRightDockOpen(true);
+                setActiveDrawer('TELEMETRY');
               }}
               className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#6FAFFF] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
             >
@@ -887,7 +891,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   A* Telemetry
                 </span>
                 <button
-                  onClick={() => setRightDockOpen(false)}
+                  onClick={() => setActiveDrawer('CLOSED')}
                   className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] lg:hidden"
                 >
                   <X className="w-4 h-4" />

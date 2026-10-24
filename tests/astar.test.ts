@@ -308,4 +308,44 @@ describe('A* Pathfinding Engine — Mathematical Rigor & Admissibility', () => {
     expect(result.path.length - 1).toBeGreaterThanOrEqual(2);
     expect(result.totalCost).toBeLessThanOrEqual(4.0);
   });
+
+  it('correctly reports BFS weighted route cost vs hop count on Algorithm Arena weighted topology', () => {
+    const rows = 13;
+    const cols = 21;
+    const start = { r: 6, c: 2 };
+    const goal = { r: 6, c: 18 };
+
+    const grid = createGrid(rows, cols);
+    // Center highway is rough terrain (cost 3.0), cols 7 to 13
+    for (let r = 4; r <= 8; r++) {
+      for (let c = 7; c <= 13; c++) {
+        grid[r][c] = 'ROUGH_TERRAIN';
+      }
+    }
+
+    const astar = findPathAStar({ grid, rows, cols, start, goal, movementMode: '4-directional' });
+    const dijkstra = findPathDijkstra({ grid, rows, cols, start, goal, movementMode: '4-directional' });
+    const bfs = findPathBFS({ grid, rows, cols, start, goal, movementMode: '4-directional' });
+
+    expect(astar.found).toBe(true);
+    expect(dijkstra.found).toBe(true);
+    expect(bfs.found).toBe(true);
+
+    // BFS finds the fewest hops (straight line along row 6: 16 movement steps, 17 path nodes)
+    const bfsSteps = bfs.path.length - 1;
+    expect(bfsSteps).toBe(16);
+    expect(bfs.path.length).toBe(17);
+    // Traversed 7 rough terrain cells (cols 7..13) + 9 empty cells: 7 * 3.0 + 9 * 1.0 = 30.0!
+    expect(bfs.totalCost).toBe(30.0);
+
+    // A* and Dijkstra find the cost-optimal detour (22 steps around r=3 or r=9, cost 22.0)
+    const astarSteps = astar.path.length - 1;
+    expect(astarSteps).toBe(22);
+    expect(astar.totalCost).toBe(22.0);
+    expect(dijkstra.totalCost).toBe(22.0);
+
+    // Crucial DSA comparison: BFS takes fewer steps (16 < 22), but higher route cost (30.0 > 22.0)
+    expect(bfs.totalCost).toBeGreaterThan(astar.totalCost);
+    expect(bfsSteps).toBeLessThan(astarSteps);
+  });
 });
