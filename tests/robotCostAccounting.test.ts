@@ -144,4 +144,68 @@ describe('RobotController Cost Accounting & Dynamic Replanning Telemetry', () =>
     expect(tel.remainingCost).toBe(0);
     expect(tel.totalMissionCost).toBe(5.0);
   });
+
+  it('resets all state, counters, and telemetry cleanly on robot.reset()', () => {
+    const robot = new RobotController({ r: 0, c: 0 });
+    const path: GridCoord[] = [
+      { r: 0, c: 0 },
+      { r: 0, c: 1 },
+      { r: 0, c: 2 },
+    ];
+    robot.setPath(path, 2.0);
+    robot.startMoving();
+    robot.update(0.3, 1.0);
+    robot.replansCount = 3;
+
+    // Reset back to start
+    robot.reset({ r: 0, c: 0 });
+
+    const tel = robot.getTelemetry();
+    expect(tel.totalStepsTaken).toBe(0);
+    expect(tel.executedCost).toBe(0);
+    expect(tel.remainingCost).toBe(0);
+    expect(tel.totalMissionCost).toBe(0);
+    expect(tel.replansCount).toBe(0);
+    expect(tel.state).toBe('IDLE');
+    expect(tel.currentLogicalCoord).toEqual({ r: 0, c: 0 });
+  });
+
+  it('computes deterministic presentation detour through row 3 bypass openings', () => {
+    // Replicate presentation mission grid: rows=11, cols=21, start=(5,2), target=(5,18)
+    const rows = 11;
+    const cols = 21;
+    const grid: TileType[][] = Array.from({ length: rows }, () => Array(cols).fill('EMPTY'));
+
+    // Divider wall row 4 with bypass at col 7 and col 14
+    [4, 5, 6, 8, 9, 10, 11, 12, 13, 15].forEach((c) => {
+      grid[4][c] = 'WALL';
+    });
+    // Divider wall row 6
+    [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15].forEach((c) => {
+      grid[6][c] = 'WALL';
+    });
+
+    // Robot is at (5, 6) when blockage at (5, 10) occurs
+    grid[5][10] = 'WALL';
+
+    const res = findPathAStar({
+      grid,
+      rows,
+      cols,
+      start: { r: 5, c: 6 },
+      goal: { r: 5, c: 18 },
+      movementMode: '4-directional',
+      heuristicType: 'manhattan',
+    });
+
+    expect(res.found).toBe(true);
+    // Path must pass through col 7 bypass: (5, 6) -> (5, 7) -> (4, 7) -> (3, 7)
+    expect(res.path.some((p) => p.r === 4 && p.c === 7)).toBe(true);
+    // Path must use upper corridor row 3
+    expect(res.path.some((p) => p.r === 3 && p.c === 10)).toBe(true);
+    // Path must descend through col 14 bypass: (3, 14) -> (4, 14) -> (5, 14)
+    expect(res.path.some((p) => p.r === 4 && p.c === 14)).toBe(true);
+    // Path successfully reaches target (5, 18)
+    expect(res.path[res.path.length - 1]).toEqual({ r: 5, c: 18 });
+  });
 });

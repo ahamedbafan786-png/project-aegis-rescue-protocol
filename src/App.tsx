@@ -13,6 +13,7 @@ import { MissionDefinition, MISSIONS } from './missions/missionData';
 export function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenMode>('menu');
   const [currentMission, setCurrentMission] = useState<MissionDefinition>(MISSIONS[0]);
+  const [missionSessionId, setMissionSessionId] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(sound.isMuted);
 
   // Persistence for completed missions & stars
@@ -48,6 +49,7 @@ export function App() {
   const handleSelectMission = (mission: MissionDefinition) => {
     setResultsModalOpen(false);
     setCurrentMission(mission);
+    setMissionSessionId((id) => id + 1);
     setCurrentScreen('game');
   };
 
@@ -71,6 +73,7 @@ export function App() {
       badgeLabel: 'SANDBOX',
     };
     setCurrentMission(sandboxMission);
+    setMissionSessionId((id) => id + 1);
     setCurrentScreen('game');
   };
 
@@ -109,11 +112,18 @@ export function App() {
     setResultsModalOpen(false);
     const currentIndex = MISSIONS.findIndex((m) => m.id === currentMission.id);
     if (currentIndex >= 0 && currentIndex < MISSIONS.length - 1) {
-      setCurrentMission(MISSIONS[currentIndex + 1]);
+      const nextM = MISSIONS[currentIndex + 1];
+      setCurrentMission(nextM);
+      setMissionSessionId((id) => id + 1);
       setCurrentScreen('game');
     } else {
       setCurrentScreen('missions');
     }
+  };
+
+  const handleReplayMission = () => {
+    setResultsModalOpen(false);
+    setMissionSessionId((id) => id + 1);
   };
 
   return (
@@ -144,8 +154,10 @@ export function App() {
 
         {currentScreen === 'game' && (
           <GameHUD
+            key={`${currentMission.id}-${missionSessionId}`}
             mission={currentMission}
             onMissionComplete={handleMissionComplete}
+            onReplay={handleReplayMission}
             onExit={() => {
               setResultsModalOpen(false);
               setCurrentScreen('missions');
@@ -174,11 +186,7 @@ export function App() {
           pathCost={latestResults.cost}
           targetStepsForStar3={currentMission.targetStepsForStar3}
           onClose={() => setResultsModalOpen(false)}
-          onReplay={() => {
-            setResultsModalOpen(false);
-            // Reloading the same mission restarts it cleanly
-            setCurrentMission({ ...currentMission });
-          }}
+          onReplay={handleReplayMission}
           onNextMission={handleNextMission}
         />
       )}

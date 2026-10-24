@@ -29,6 +29,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   const mission = MISSIONS.find((m) => m.id === 'mission-presentation') || MISSIONS[0];
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const rendererRef = useRef<AegisRenderer | null>(null);
 
   const [gridModel, setGridModel] = useState<GridModel>(() => {
@@ -99,25 +100,31 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
 
     const renderer = new AegisRenderer(canvas);
     rendererRef.current = renderer;
 
     const handleResize = () => {
-      const rect = canvas.parentElement?.getBoundingClientRect();
-      if (rect) {
+      const rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
         renderer.resize(rect.width, rect.height, gridModel.rows, gridModel.cols);
       }
     };
 
     handleResize();
+    const ro = new ResizeObserver(() => handleResize());
+    ro.observe(container);
     window.addEventListener('resize', handleResize);
 
     const initialPlan = computeRoute(gridModel.start);
     robotRef.current.setPath(initialPlan.path, initialPlan.totalCost);
 
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   // 60 FPS Loop
@@ -238,7 +245,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
 
     let blockCoord: GridCoord | null = null;
 
-    // Check if preset demo blockage coordinate (5, 11) is ahead in remaining waypoints
+    // Check if preset demo blockage coordinate (5, 10) is ahead in remaining waypoints
     if (
       mission.demoBlockageCoord &&
       remaining.some(
@@ -268,26 +275,119 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     setGridModel(nextModel);
 
     // Particle dust & visual storytelling in renderer
-    rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 14);
+    rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 16);
     rendererRef.current?.triggerBlockageVisual(blockCoord, activePath, robot.logicalPos);
 
     robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
   };
 
-  const canTriggerBlockage =
-    (robotState === 'MOVING' || robotState === 'CONFIRMED' || robotState === 'IDLE') &&
-    activePath.length > robotRef.current.currentWaypointIndex + 1;
+  // Demo window detection per Phase 2 requirements
+  const isInDemoWindow =
+    robotState === 'MOVING' &&
+    telemetry.replans === 0 &&
+    telemetry.r === 5 &&
+    telemetry.c >= 3 &&
+    telemetry.c <= 7;
+
+  const isPastDemoWindow =
+    telemetry.replans === 0 &&
+    ((telemetry.r === 5 && telemetry.c > 7) || telemetry.r !== 5) &&
+    robotState === 'MOVING';
+
+  const isDetourActive = telemetry.replans > 0;
+
+  // Compute status pill display
+  let statusBadgeColor = 'bg-[#66DAD5]/20 border-[#66DAD5]/60 text-[#66DAD5]';
+  let statusBadgeDot = 'bg-[#66DAD5]';
+  let displayStatus = statusMessage;
+
+  if (isInDemoWindow) {
+    statusBadgeColor = 'bg-[#86E3B4]/25 border-[#86E3B4] text-[#86E3B4] animate-pulse';
+    statusBadgeDot = 'bg-[#86E3B4] animate-ping';
+    displayStatus = 'DEMO READY: TRIGGER COLLAPSE NOW';
+  } else if (isDetourActive && robotState === 'MOVING') {
+    statusBadgeColor = 'bg-[#66DAD5]/25 border-[#66DAD5] text-[#66DAD5]';
+    statusBadgeDot = 'bg-[#66DAD5] animate-ping';
+    displayStatus = 'DYNAMIC REPLAN: A* DETOUR VIA BYPASS';
+  } else if (robotState === 'BLOCKED' || robotState === 'REPLANNING') {
+    statusBadgeColor = 'bg-[#FF9B83]/25 border-[#FF9B83]/80 text-[#FF9B83] animate-pulse';
+    statusBadgeDot = 'bg-[#FF9B83]';
+  } else if (robotState === 'ARRIVED') {
+    statusBadgeColor = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4]';
+    statusBadgeDot = 'bg-[#86E3B4]';
+  } else if (robotState === 'MOVING') {
+    statusBadgeColor = 'bg-[#6FAFFF]/20 border-[#6FAFFF]/60 text-[#6FAFFF]';
+    statusBadgeDot = 'bg-[#6FAFFF] animate-ping';
+  }
+
+  // Compute trigger button states
+  let triggerButtonContent: React.ReactNode = (
+    <>
+      <AlertOctagon className="w-4 h-4" />
+      <span>Trigger Blockage</span>
+    </>
+  );
+  let triggerButtonClass = 'bg-[#2B3B5B]/50 border-[#3E527D]/50 text-[#A1ADC7]/60 cursor-not-allowed';
+  let triggerButtonDisabled = true;
+  let triggerButtonTitle = 'Deploy Aegis-1 first, then trigger collapse during demo window';
+
+  if (isInDemoWindow) {
+    triggerButtonDisabled = false;
+    triggerButtonClass =
+      'bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#151F36] shadow-lg shadow-[#FF9B83]/40 border-[#FF9B83] animate-pulse hover:scale-[1.03] active:scale-[0.97]';
+    triggerButtonTitle =
+      'Trigger structural collapse at (5, 10) to demonstrate mid-transit A* replanning through the bypass!';
+    triggerButtonContent = (
+      <>
+        <AlertOctagon className="w-4 h-4 animate-bounce" />
+        <span>TRIGGER COLLAPSE NOW</span>
+      </>
+    );
+  } else if (isDetourActive) {
+    triggerButtonDisabled = true;
+    triggerButtonClass = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4] cursor-default';
+    triggerButtonTitle = 'A* has successfully replanned around the collapse!';
+    triggerButtonContent = (
+      <>
+        <Sparkles className="w-4 h-4 text-[#86E3B4]" />
+        <span>DETOUR IN PROGRESS</span>
+      </>
+    );
+  } else if (isPastDemoWindow) {
+    triggerButtonDisabled = true;
+    triggerButtonClass = 'bg-[#2B3B5B]/40 border-[#3E527D]/40 text-[#A1ADC7]/50 cursor-not-allowed';
+    triggerButtonTitle =
+      'Demo window passed — Aegis-1 already past bypass opening. Click Reset Demo to demonstrate again.';
+    triggerButtonContent = (
+      <>
+        <AlertOctagon className="w-4 h-4 opacity-50" />
+        <span>Window Passed (Reset to retry)</span>
+      </>
+    );
+  } else if (robotState === 'IDLE' || robotState === 'CONFIRMED') {
+    triggerButtonDisabled = true;
+    triggerButtonClass = 'bg-[#2B3B5B]/40 border-[#3E527D]/40 text-[#A1ADC7]/50 cursor-not-allowed';
+    triggerButtonTitle = 'Click Deploy Robot first, then trigger collapse while robot is in transit';
+    triggerButtonContent = (
+      <>
+        <AlertOctagon className="w-4 h-4" />
+        <span>Trigger Blockage</span>
+      </>
+    );
+  }
 
   return (
-    <div className="flex-1 w-full bg-[#151F36] text-[#F5F7FF] flex flex-col select-none overflow-hidden">
+    <div className="flex-1 w-full bg-[#151F36] text-[#F5F7FF] flex flex-col select-none overflow-hidden min-h-0">
       {/* Top Presentation Bar */}
-      <div className="bg-[#1C2844] border-b border-[#2B3B5B] px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between z-20 shrink-0">
-        <div className="flex items-center gap-3 sm:gap-4">
+      <div className="bg-[#1C2844] border-b border-[#2B3B5B] px-3 sm:px-6 py-2 sm:py-2.5 flex flex-wrap items-center justify-between gap-2 z-20 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4">
           <button
             onClick={() => {
               sound.playClick();
               onExit();
             }}
+            data-exit-presentation
+            title="Exit Presentation"
             className="flex items-center gap-1.5 text-xs font-bold text-[#A1ADC7] hover:text-[#F5F7FF] px-2.5 py-1.5 rounded-lg bg-[#151F36] border border-[#2B3B5B] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -298,7 +398,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
             <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[#FF9B83] tracking-widest uppercase block">
               COLLEGE DEMONSTRATION EXHIBIT
             </span>
-            <h2 className="text-sm sm:text-base font-extrabold text-[#F5F7FF] leading-tight">
+            <h2 className="text-xs sm:text-base font-extrabold text-[#F5F7FF] leading-tight">
               Autonomous Robot Path Planning · Live A* Replanning
             </h2>
           </div>
@@ -308,7 +408,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowPresenterNotes((v) => !v)}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
               showPresenterNotes
                 ? 'bg-[#66DAD5]/20 border-[#66DAD5] text-[#66DAD5]'
                 : 'bg-[#151F36] border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
@@ -319,34 +419,21 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
           </button>
 
           <div
-            className={`px-3 py-1.5 rounded-full text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 border shadow-md ${
-              robotState === 'MOVING'
-                ? 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4]'
-                : robotState === 'BLOCKED' || robotState === 'REPLANNING'
-                ? 'bg-[#FF9B83]/25 border-[#FF9B83]/80 text-[#FF9B83] animate-pulse'
-                : robotState === 'ARRIVED'
-                ? 'bg-[#F5CF79]/20 border-[#F5CF79]/60 text-[#F5CF79]'
-                : 'bg-[#66DAD5]/20 border-[#66DAD5]/60 text-[#66DAD5]'
-            }`}
+            className={`px-3 py-1.5 rounded-full text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 border shadow-md ${statusBadgeColor}`}
           >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                robotState === 'MOVING'
-                  ? 'bg-[#86E3B4] animate-ping'
-                  : robotState === 'BLOCKED'
-                  ? 'bg-[#FF9B83]'
-                  : 'bg-[#66DAD5]'
-              }`}
-            />
-            {statusMessage}
+            <span className={`w-2 h-2 rounded-full ${statusBadgeDot}`} />
+            {displayStatus}
           </div>
         </div>
       </div>
 
       {/* Main Full-Scale Canvas */}
-      <div className="flex-1 flex flex-col relative overflow-hidden bg-[#151F36]">
-        <div className="flex-1 flex items-center justify-center p-3 sm:p-5">
-          <canvas ref={canvasRef} className="max-w-full max-h-full rounded-2xl shadow-2xl" />
+      <div className="flex-1 flex flex-col relative overflow-hidden bg-[#151F36] min-h-0">
+        <div
+          ref={containerRef}
+          className="flex-1 w-full h-full flex items-center justify-center p-2 sm:p-4 overflow-hidden min-h-0"
+        >
+          <canvas ref={canvasRef} className="block rounded-xl shadow-2xl" />
         </div>
 
         {/* Presenter Cue Card Drawer (Toggled On Demand) */}
@@ -369,7 +456,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
                 Click <strong className="text-[#66DAD5]">Deploy Robot</strong> — A* calculates the optimal direct route along the main corridor.
               </li>
               <li>
-                While Aegis-1 is moving, click <strong className="text-[#FF9B83]">TRIGGER BLOCKAGE</strong> to simulate an emergency structural collapse.
+                While Aegis-1 is in the demo window, click <strong className="text-[#FF9B83]">TRIGGER COLLAPSE NOW</strong> to simulate an emergency structural collapse.
               </li>
               <li>
                 Point out to the lecturer: <strong className="text-[#F5F7FF]">Aegis-1 detects the blockage, halts without clipping, recalculates with A*, and detours through the outer bypass! Traversal costs accumulate continuously without reset.</strong>
@@ -380,12 +467,12 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
       </div>
 
       {/* High-Contrast Bottom Presentation Controls */}
-      <div className="bg-[#1C2844] border-t border-[#2B3B5B] px-4 sm:px-8 py-3 sm:py-3.5 flex flex-wrap items-center justify-between gap-3 z-20 shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="bg-[#1C2844] border-t border-[#2B3B5B] px-3 sm:px-6 py-2 sm:py-3 flex flex-wrap items-center justify-between gap-2 sm:gap-4 z-20 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Main Action Button */}
           <button
             onClick={handleDeploy}
-            className="px-5 sm:px-7 py-2.5 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] hover:from-[#5bc7c2] hover:to-[#5ea0ee] text-[#151F36] font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 shadow-xl shadow-[#66DAD5]/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="px-4 sm:px-7 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] hover:from-[#5bc7c2] hover:to-[#5ea0ee] text-[#151F36] font-extrabold text-xs sm:text-sm uppercase tracking-wider flex items-center gap-2 shadow-xl shadow-[#66DAD5]/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             {robotState === 'MOVING' ? (
               <>
@@ -408,7 +495,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
           {/* Reset */}
           <button
             onClick={handleReset}
-            className="px-3.5 py-2.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors"
+            className="px-3 py-2 sm:py-2.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Reset</span>
@@ -416,25 +503,29 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         </div>
 
         {/* Live Presentation Telemetry Counters */}
-        <div className="flex items-center gap-3 sm:gap-6 font-mono text-xs">
+        <div className="flex items-center gap-2 sm:gap-6 font-mono text-xs">
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Steps</span>
-            <span className="text-sm sm:text-base font-bold text-[#F5F7FF]">{telemetry.stepsTaken}</span>
+            <span className="text-xs sm:text-base font-bold text-[#F5F7FF]">{telemetry.stepsTaken}</span>
           </div>
 
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Traversed</span>
-            <span className="text-sm sm:text-base font-bold text-[#86E3B4]">{telemetry.executedCost.toFixed(1)}</span>
+            <span className="text-xs sm:text-base font-bold text-[#86E3B4]">
+              {telemetry.executedCost.toFixed(1)}
+            </span>
           </div>
 
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Total Cost</span>
-            <span className="text-sm sm:text-base font-bold text-[#66DAD5]">{telemetry.totalMissionCost.toFixed(1)}</span>
+            <span className="text-xs sm:text-base font-bold text-[#66DAD5]">
+              {telemetry.totalMissionCost.toFixed(1)}
+            </span>
           </div>
 
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Replans</span>
-            <span className="text-sm sm:text-base font-bold text-[#FF9B83]">{telemetry.replans}</span>
+            <span className="text-xs sm:text-base font-bold text-[#FF9B83]">{telemetry.replans}</span>
           </div>
 
           <div className="hidden md:block text-center">
@@ -447,15 +538,11 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         <div>
           <button
             onClick={handleTriggerBlockage}
-            disabled={!canTriggerBlockage}
-            className={`px-4 sm:px-6 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 border transition-all ${
-              canTriggerBlockage
-                ? 'bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#151F36] shadow-[#FF9B83]/35 hover:scale-[1.03] active:scale-[0.97] border-[#FF9B83]'
-                : 'bg-[#2B3B5B]/50 border-[#3E527D]/50 text-[#A1ADC7]/60 cursor-not-allowed'
-            }`}
+            disabled={triggerButtonDisabled}
+            title={triggerButtonTitle}
+            className={`px-3.5 sm:px-6 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-xl flex items-center gap-2 border transition-all ${triggerButtonClass}`}
           >
-            <AlertOctagon className="w-4 h-4" />
-            <span>Trigger Blockage</span>
+            {triggerButtonContent}
           </button>
         </div>
       </div>

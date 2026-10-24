@@ -135,6 +135,7 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
               sound.playClick();
               onReplay();
             }}
+            data-action="replay"
             className="flex-1 py-3 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
@@ -146,6 +147,7 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
               sound.playClick();
               onNextMission();
             }}
+            data-action="next-mission"
             className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] hover:from-[#5cc7c2] hover:to-[#5fa4ee] text-[#17233D] font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#66DAD5]/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             Next Mission

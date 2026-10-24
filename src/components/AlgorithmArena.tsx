@@ -24,7 +24,7 @@ interface BenchmarkStat {
 
 export const AlgorithmArena: React.FC = () => {
   // Preset arena maps
-  const [mapType, setMapType] = useState<'corridor' | 'open' | 'maze'>('corridor');
+  const [mapType, setMapType] = useState<'corridor' | 'open' | 'maze' | 'weighted'>('corridor');
   const [activeTab, setActiveTab] = useState<'astar' | 'dijkstra' | 'bfs'>('astar');
 
   const rows = 13;
@@ -48,6 +48,13 @@ export const AlgorithmArena: React.FC = () => {
       for (let r = 2; r < rows - 2; r += 2) {
         for (let c = 4; c < cols - 4; c += 2) {
           grid[r][c] = 'WALL';
+        }
+      }
+    } else if (mapType === 'weighted') {
+      // Center highway is rough terrain (cost 3.0), bypass above and below is open (cost 1.0)
+      for (let r = 4; r <= 8; r++) {
+        for (let c = 7; c <= 13; c++) {
+          grid[r][c] = 'ROUGH_TERRAIN';
         }
       }
     }
@@ -199,6 +206,9 @@ export const AlgorithmArena: React.FC = () => {
 
         if (grid[r][c] === 'WALL') {
           fill = '#121A2B';
+        } else if (grid[r][c] === 'ROUGH_TERRAIN') {
+          fill = pathSet.has(key) ? (activeTab === 'astar' ? '#66DAD5' : activeTab === 'dijkstra' ? '#6FAFFF' : '#A695F2') : 'rgba(245, 207, 121, 0.25)';
+          stroke = 'rgba(245, 207, 121, 0.8)';
         } else if (pathSet.has(key)) {
           fill = activeTab === 'astar' ? '#66DAD5' : activeTab === 'dijkstra' ? '#6FAFFF' : '#A695F2';
         } else if (exploredSet.has(key)) {
@@ -249,7 +259,7 @@ export const AlgorithmArena: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-[#A1ADC7]">Topology:</span>
-            {(['corridor', 'open', 'maze'] as const).map((m) => (
+            {(['corridor', 'open', 'maze', 'weighted'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => {
@@ -461,10 +471,10 @@ export const AlgorithmArena: React.FC = () => {
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-[#A1ADC7] leading-relaxed">
             <p>
-              <strong className="text-[#66DAD5]">Heuristic Search Pruning:</strong> Because Manhattan/Octile heuristics are <strong className="text-[#F5F7FF]">strictly admissible</strong> ($h(n) \le h^*(n)$), A* prioritizes nodes directed toward the destination, reducing exploratory node overhead while mathematically guaranteeing that the final route cost is identical to Dijkstra's optimal shortest path.
+              <strong className="text-[#66DAD5]">Heuristic Search Pruning:</strong> Because Manhattan/Octile heuristics are <strong className="text-[#F5F7FF]">strictly admissible</strong> (h(n) ≤ h*(n) with zero heuristic inflation), A* prioritizes nodes directed toward the destination, reducing exploratory node overhead while mathematically guaranteeing that the final route cost is identical to Dijkstra's optimal shortest path.
             </p>
             <p>
-              <strong className="text-[#A695F2]">Honest Benchmark Measurement:</strong> Sub-millisecond JS execution times are subject to browser JIT optimizations, thread interleaving, and micro-task scheduling. We report the <strong className="text-[#F5F7FF]">median of 7 repeated runs</strong> alongside the observed variability range (±variance) rather than claiming artificial microsecond precision.
+              <strong className="text-[#F5CF79]">Weighted Terrain Dynamics:</strong> On weighted terrain (Rough Terrain cost = 3.0×), standard BFS only counts step hops and naively traverses through rough ground, yielding a suboptimal total cost. In contrast, both A* and Dijkstra compute true cost-optimal detours, with A* expanding significantly fewer search nodes.
             </p>
           </div>
         </div>

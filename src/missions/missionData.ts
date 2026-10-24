@@ -144,11 +144,12 @@ export const MISSIONS: MissionDefinition[] = [
     targetStepsForStar3: 25,
     environmentTheme: 'presentation',
     badgeLabel: 'DEMO PROTOCOL',
-    demoBlockageCoord: { r: 5, c: 11 }, // Exactly in the middle of the robot's primary highway!
+    demoBlockageCoord: { r: 5, c: 10 }, // Directly blocks highway ahead of Aegis-1
     initialWalls: [
-      // Top divider wall separating main highway from upper corridor (leaving openings at start and end)
-      { r: 4, c: 4 }, { r: 4, c: 5 }, { r: 4, c: 6 }, { r: 4, c: 7 }, { r: 4, c: 8 }, { r: 4, c: 9 },
-      { r: 4, c: 10 }, { r: 4, c: 11 }, { r: 4, c: 12 }, { r: 4, c: 13 }, { r: 4, c: 14 }, { r: 4, c: 15 },
+      // Top divider wall with intentional bypass openings at col 7 and col 14 into row 3
+      { r: 4, c: 4 }, { r: 4, c: 5 }, { r: 4, c: 6 },
+      { r: 4, c: 8 }, { r: 4, c: 9 }, { r: 4, c: 10 }, { r: 4, c: 11 }, { r: 4, c: 12 }, { r: 4, c: 13 },
+      { r: 4, c: 15 },
       // Bottom divider wall separating main highway from lower corridor
       { r: 6, c: 4 }, { r: 6, c: 5 }, { r: 6, c: 6 }, { r: 6, c: 7 }, { r: 6, c: 8 }, { r: 6, c: 9 },
       { r: 6, c: 10 }, { r: 6, c: 11 }, { r: 6, c: 12 }, { r: 6, c: 13 }, { r: 6, c: 14 }, { r: 6, c: 15 },

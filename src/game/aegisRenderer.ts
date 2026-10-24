@@ -69,15 +69,15 @@ export class AegisRenderer {
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(dpr, dpr);
 
-    const pad = 24;
-    const availW = width - pad * 2;
-    const availH = height - pad * 2;
+    const pad = width < 600 || height < 500 ? 10 : 20;
+    const availW = Math.max(width - pad * 2, 40);
+    const availH = Math.max(height - pad * 2, 40);
     const tileW = Math.floor(availW / cols);
     const tileH = Math.floor(availH / rows);
-    this.tileSize = Math.max(22, Math.min(68, Math.min(tileW, tileH)));
+    this.tileSize = Math.max(10, Math.min(68, Math.min(tileW, tileH)));
 
-    this.offsetX = Math.floor((width - cols * this.tileSize) / 2);
-    this.offsetY = Math.floor((height - rows * this.tileSize) / 2);
+    this.offsetX = Math.max(0, Math.floor((width - cols * this.tileSize) / 2));
+    this.offsetY = Math.max(0, Math.floor((height - rows * this.tileSize) / 2));
   }
 
   public screenToGrid(screenX: number, screenY: number, rows: number, cols: number): GridCoord | null {
@@ -263,9 +263,26 @@ export class AegisRenderer {
       ctx.restore();
     }
 
-    // 10. Render Start Pad & Target Distress Beacon
+    // 10. Render Start Pad & Cryo-Stasis Rescue Pod
     this.renderStartPad(gridModel.start, theme);
-    this.renderTargetBeacon(gridModel.target);
+    this.renderRescuePod(gridModel.target, robot);
+
+    // Dynamic arrival sparkles when survivor is secured
+    if (robot.state === 'ARRIVED' && Math.random() < 0.28) {
+      const tcx = this.offsetX + gridModel.target.c * this.tileSize + this.tileSize / 2;
+      const tcy = this.offsetY + gridModel.target.r * this.tileSize + this.tileSize / 2;
+      this.particles.push({
+        x: tcx + (Math.random() - 0.5) * this.tileSize * 0.7,
+        y: tcy + (Math.random() - 0.5) * this.tileSize * 0.7,
+        vx: (Math.random() - 0.5) * 18,
+        vy: -Math.random() * 36 - 16,
+        size: Math.random() * 2.8 + 1.2,
+        color: '#86E3B4',
+        alpha: 0.95,
+        life: 0,
+        maxLife: 0.8,
+      });
+    }
 
     // 11. Update & Render Robot Motion Trail
     this.updateAndRenderTrail(robot, deltaSec);
@@ -565,7 +582,7 @@ export class AegisRenderer {
       ctx.strokeStyle = `rgba(255, 120, 100, ${sw.alpha})`;
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+      ctx.arc(sw.x, sw.y, Math.max(0.1, sw.radius), 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
@@ -640,39 +657,190 @@ export class AegisRenderer {
     ctx.restore();
   }
 
-  private renderTargetBeacon(coord: GridCoord): void {
+  private renderRescuePod(coord: GridCoord, robot: RobotController): void {
     const { ctx, tileSize } = this;
     const cx = this.offsetX + coord.c * tileSize + tileSize / 2;
     const cy = this.offsetY + coord.r * tileSize + tileSize / 2;
-    const pulse = (Math.sin(this.pulsePhase) + 1) * 0.5;
+    const isArrived = robot.state === 'ARRIVED';
+    const pulse = (Math.sin(this.pulsePhase * 2.5) + 1) * 0.5;
 
     ctx.save();
-    // Expanding radar waves
-    const maxR = Math.max(1, tileSize * 0.52);
-    const curR = Math.max(0.1, (Math.abs(this.pulsePhase) * 9) % maxR);
-    ctx.strokeStyle = `rgba(134, 227, 180, ${Math.max(0, 1 - curR / maxR)})`;
+
+    // 1. Expanding radar distress transmission pulses
+    const maxR = Math.max(1, tileSize * 0.7);
+    const curR = Math.max(0.1, (Math.abs(this.pulsePhase) * 12) % maxR);
+    ctx.strokeStyle = isArrived
+      ? `rgba(134, 227, 180, ${Math.max(0, 0.8 * (1 - curR / maxR))})`
+      : `rgba(255, 155, 131, ${Math.max(0, 0.75 * (1 - curR / maxR))})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(cx, cy, curR, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Core holographic distress beacon
-    ctx.fillStyle = '#86E3B4';
-    ctx.shadowColor = 'rgba(134, 227, 180, 0.85)';
-    ctx.shadowBlur = 14;
+    // 2. Pod Base Docking Mount (Hexagonal metal plate)
+    const baseR = Math.max(4, tileSize * 0.38);
+    ctx.fillStyle = '#0F1626';
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.arc(cx, cy, Math.max(0.1, 6 + pulse * 2.5), 0, Math.PI * 2);
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2 + Math.PI / 6;
+      const bx = cx + Math.cos(angle) * baseR;
+      const by = cy + Math.sin(angle) * baseR;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+
+    ctx.strokeStyle = isArrived ? '#86E3B4' : '#FF9B83';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 3. Stasis Chamber Capsule (Vertical Pill Silhouette)
+    const podW = Math.max(6, tileSize * 0.38);
+    const podH = Math.max(10, tileSize * 0.56);
+    const podX = cx - podW / 2;
+    const podY = cy - podH / 2;
+
+    // Outer Armored Shell
+    ctx.fillStyle = '#1B263B';
+    this.roundRect(podX, podY, podW, podH, podW * 0.45);
+    ctx.fill();
+    ctx.strokeStyle = isArrived ? '#86E3B4' : '#6FAFFF';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Inner Glass Cryo-Chamber
+    const glassW = podW * 0.72;
+    const glassH = podH * 0.68;
+    const glassX = cx - glassW / 2;
+    const glassY = cy - glassH / 2 - 1;
+
+    const chamberGrad = ctx.createLinearGradient(glassX, glassY, glassX + glassW, glassY + glassH);
+    if (isArrived) {
+      chamberGrad.addColorStop(0, '#10382B');
+      chamberGrad.addColorStop(0.5, '#1A5944');
+      chamberGrad.addColorStop(1, '#0D2B21');
+    } else {
+      chamberGrad.addColorStop(0, '#122538');
+      chamberGrad.addColorStop(0.5, '#183652');
+      chamberGrad.addColorStop(1, '#0C1A29');
+    }
+    ctx.fillStyle = chamberGrad;
+    this.roundRect(glassX, glassY, glassW, glassH, glassW * 0.45);
     ctx.fill();
 
-    // Tactical crosshairs
-    ctx.strokeStyle = 'rgba(134, 227, 180, 0.9)';
+    // 4. Survivor Silhouette & Heartbeat ECG Waveform
+    ctx.save();
+    ctx.beginPath();
+    this.roundRect(glassX, glassY, glassW, glassH, glassW * 0.45);
+    ctx.clip();
+
+    // Humanoid silhouette in stasis
+    ctx.fillStyle = isArrived ? 'rgba(134, 227, 180, 0.55)' : 'rgba(102, 218, 213, 0.4)';
+    // Head
+    ctx.beginPath();
+    ctx.arc(cx, cy - podH * 0.16, Math.max(0.1, podW * 0.16), 0, Math.PI * 2);
+    ctx.fill();
+    // Torso
+    ctx.beginPath();
+    ctx.moveTo(cx - podW * 0.22, cy + podH * 0.2);
+    ctx.lineTo(cx + podW * 0.22, cy + podH * 0.2);
+    ctx.lineTo(cx + podW * 0.14, cy - podH * 0.05);
+    ctx.lineTo(cx - podW * 0.14, cy - podH * 0.05);
+    ctx.closePath();
+    ctx.fill();
+
+    // Heartbeat ECG line across the glass
+    const ecgY = cy + podH * 0.05;
+    const ecgColor = isArrived ? '#86E3B4' : '#66DAD5';
+    ctx.strokeStyle = ecgColor;
+    ctx.lineWidth = 1;
+    ctx.shadowColor = ecgColor;
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    const ecgW = glassW * 0.9;
+    const startX = cx - ecgW / 2;
+    ctx.moveTo(startX, ecgY);
+    ctx.lineTo(startX + ecgW * 0.35, ecgY);
+    ctx.lineTo(startX + ecgW * 0.42, ecgY - 4);
+    ctx.lineTo(startX + ecgW * 0.52, ecgY + 5);
+    ctx.lineTo(startX + ecgW * 0.6, ecgY - 2);
+    ctx.lineTo(startX + ecgW * 0.68, ecgY);
+    ctx.lineTo(startX + ecgW, ecgY);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Glass reflection specular highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx - podW * 0.2, cy - podH * 0.18, Math.max(0.1, podW * 0.22), -Math.PI * 0.6, -Math.PI * 0.1);
+    ctx.stroke();
+
+    // 5. Emergency Beacon Antenna Mast atop Pod
+    const mastTopY = podY - podH * 0.22;
+    ctx.strokeStyle = '#6FAFFF';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(cx - 10, cy);
-    ctx.lineTo(cx + 10, cy);
-    ctx.moveTo(cx, cy - 10);
-    ctx.lineTo(cx, cy + 10);
+    ctx.moveTo(cx, podY);
+    ctx.lineTo(cx, mastTopY);
     ctx.stroke();
+
+    // Strobe Beacon Bulb
+    const beaconColor = isArrived ? '#86E3B4' : '#FF9B83';
+    ctx.fillStyle = beaconColor;
+    ctx.shadowColor = beaconColor;
+    ctx.shadowBlur = 10;
+    ctx.beginPath();
+    ctx.arc(cx, mastTopY, Math.max(1, 2.5 + pulse * 1.5), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // 6. Rescue Arrival Sequence (Containment Beam & Medical Stabilization)
+    if (isArrived) {
+      // Connective containment laser beam between robot and cryo-pod
+      const rx = this.offsetX + robot.visualX * tileSize + tileSize / 2;
+      const ry = this.offsetY + robot.visualY * tileSize + tileSize / 2;
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(134, 227, 180, 0.55)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#86E3B4';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 4]);
+      ctx.lineDashOffset = -this.pulsePhase * 16;
+      ctx.beginPath();
+      ctx.moveTo(rx, ry);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // Floating Medical Cross Icon rising above pod
+      const badgeY = mastTopY - 14 - Math.sin(this.pulsePhase * 3) * 3;
+      ctx.save();
+      ctx.fillStyle = '#86E3B4';
+      ctx.shadowColor = 'rgba(134, 227, 180, 0.9)';
+      ctx.shadowBlur = 12;
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✚', cx, badgeY);
+
+      // Status pill: SECURED
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText('SECURED', cx, badgeY - 10);
+      ctx.restore();
+    }
 
     ctx.restore();
   }
@@ -698,7 +866,7 @@ export class AegisRenderer {
       ctx.fillStyle = '#66DAD5';
       ctx.globalAlpha = Math.max(0, pt.alpha * 0.35);
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, tileSize * 0.22 * pt.alpha, 0, Math.PI * 2);
+      ctx.arc(pt.x, pt.y, Math.max(0.1, tileSize * 0.22 * pt.alpha), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();

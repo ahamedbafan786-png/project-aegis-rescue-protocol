@@ -40,6 +40,7 @@ interface GameHUDProps {
   mission: MissionDefinition;
   onMissionComplete: (stats: { steps: number; replans: number; cost: number }) => void;
   onExit: () => void;
+  onReplay?: () => void;
 }
 
 export type ToolType = 'wall' | 'rough' | 'eraser' | 'start' | 'target';
@@ -48,13 +49,16 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   mission,
   onMissionComplete,
   onExit,
+  onReplay,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<AegisRenderer | null>(null);
 
-  // Layout Docks (collapsible for board-centric focus)
-  const [leftDockOpen, setLeftDockOpen] = useState<boolean>(true);
-  const [rightDockOpen, setRightDockOpen] = useState<boolean>(true);
+  // Layout Docks (collapsible for board-centric focus, default closed on mobile < 1024px)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+  const [leftDockOpen, setLeftDockOpen] = useState<boolean>(!isMobile);
+  const [rightDockOpen, setRightDockOpen] = useState<boolean>(false);
+  const [analysisModalOpen, setAnalysisModalOpen] = useState<boolean>(false);
 
   // Models
   const [gridModel, setGridModel] = useState<GridModel>(() => {
@@ -272,6 +276,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const handleToggleDeploy = () => {
     const robot = robotRef.current;
     if (robot.state === 'IDLE' || robot.state === 'CONFIRMED') {
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setLeftDockOpen(false);
+        setRightDockOpen(false);
+      }
       const res = calculatePath(robot.logicalPos);
       if (res.found) {
         robot.setPath(res.path, res.totalCost);
@@ -280,16 +288,24 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     } else if (robot.state === 'MOVING') {
       robot.pause();
     } else if (robot.state === 'ARRIVED' || robot.state === 'FAILED') {
-      // Reset and replay
-      robot.reset(gridModel.start);
-      const res = calculatePath(gridModel.start);
-      robot.setPath(res.path, res.totalCost);
+      // Clean authoritative replay
+      if (onReplay) {
+        onReplay();
+      } else {
+        robot.reset(gridModel.start);
+        const res = calculatePath(gridModel.start);
+        robot.setPath(res.path, res.totalCost);
+      }
     }
   };
 
   // Reset Simulation Handler
   const handleReset = () => {
     sound.playClick();
+    if (onReplay) {
+      onReplay();
+      return;
+    }
     const robot = robotRef.current;
     robot.reset(gridModel.start);
     const res = calculatePath(gridModel.start);
@@ -490,9 +506,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         e.preventDefault();
         handleTriggerBlockage();
       } else if (e.code === 'KeyT') {
-        setLeftDockOpen((v) => !v);
+        sound.playClick();
+        setLeftDockOpen((prev) => {
+          const next = !prev;
+          if (next && typeof window !== 'undefined' && window.innerWidth < 1024) setRightDockOpen(false);
+          return next;
+        });
       } else if (e.code === 'KeyM') {
-        setRightDockOpen((v) => !v);
+        sound.playClick();
+        setRightDockOpen((prev) => {
+          const next = !prev;
+          if (next && typeof window !== 'undefined' && window.innerWidth < 1024) setLeftDockOpen(false);
+          return next;
+        });
       } else if (e.code === 'Digit1') {
         setActiveTool('wall');
       } else if (e.code === 'Digit2') {
@@ -610,7 +636,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Toolbar Dock (Collapsible Floating / Side Panel) */}
         {leftDockOpen && (
-          <div className="absolute md:relative z-30 top-0 left-0 bottom-0 w-56 bg-[#1C2844]/95 backdrop-blur-md border-r border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 overflow-y-auto shadow-2xl md:shadow-none animate-in slide-in-from-left duration-200">
+          <div className="absolute lg:relative z-30 top-0 left-0 bottom-0 w-56 bg-[#1C2844]/95 backdrop-blur-md border-r border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 overflow-y-auto shadow-2xl lg:shadow-none animate-in slide-in-from-left duration-200">
             <div className="flex flex-col gap-3.5">
               <div className="flex items-center justify-between border-b border-[#2B3B5B] pb-2">
                 <span className="text-[11px] font-mono font-bold text-[#66DAD5] tracking-wider uppercase">
@@ -618,7 +644,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </span>
                 <button
                   onClick={() => setLeftDockOpen(false)}
-                  className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] md:hidden"
+                  className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] lg:hidden"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -825,7 +851,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {/* Quick Floating Docks Pills when collapsed */}
           {!leftDockOpen && (
             <button
-              onClick={() => setLeftDockOpen(true)}
+              onClick={() => {
+                sound.playClick();
+                if (typeof window !== 'undefined' && window.innerWidth < 1024) setRightDockOpen(false);
+                setLeftDockOpen(true);
+              }}
               className="absolute top-3 left-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#66DAD5] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
             >
               <Settings2 className="w-3.5 h-3.5" />
@@ -835,7 +865,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           {!rightDockOpen && (
             <button
-              onClick={() => setRightDockOpen(true)}
+              onClick={() => {
+                sound.playClick();
+                if (typeof window !== 'undefined' && window.innerWidth < 1024) setLeftDockOpen(false);
+                setRightDockOpen(true);
+              }}
               className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#6FAFFF] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
             >
               <Layers className="w-3.5 h-3.5" />
@@ -846,7 +880,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* Right Telemetry Dock (Collapsible Floating / Side Panel) */}
         {rightDockOpen && (
-          <div className="absolute md:relative z-30 top-0 right-0 bottom-0 w-60 bg-[#1C2844]/95 backdrop-blur-md border-l border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 overflow-y-auto shadow-2xl md:shadow-none animate-in slide-in-from-right duration-200">
+          <div className="absolute lg:relative z-30 top-0 right-0 bottom-0 w-60 bg-[#1C2844]/95 backdrop-blur-md border-l border-[#2B3B5B] p-3.5 flex flex-col justify-between shrink-0 overflow-y-auto shadow-2xl lg:shadow-none animate-in slide-in-from-right duration-200">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between border-b border-[#2B3B5B] pb-2">
                 <span className="text-[11px] font-mono font-bold text-[#6FAFFF] tracking-wider uppercase">
@@ -854,43 +888,32 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </span>
                 <button
                   onClick={() => setRightDockOpen(false)}
-                  className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] md:hidden"
+                  className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] lg:hidden"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* Live Algorithm Math Card */}
-              <div className="bg-[#151F36] rounded-xl p-2.5 border border-[#2B3B5B]">
-                <span className="text-[10px] font-mono font-bold text-[#66DAD5] uppercase block mb-1">
-                  A* Cost Breakdown
+              {/* Algorithm Analysis Action (Clutter-Free Math Card) */}
+              <button
+                onClick={() => setAnalysisModalOpen(true)}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl bg-[#151F36] hover:bg-[#202E4B] border border-[#2B3B5B] hover:border-[#66DAD5]/50 transition-all text-left group"
+                title="View full mathematical breakdown and proof of admissibility"
+              >
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-[#66DAD5] uppercase block">
+                    Formula Analysis
+                  </span>
+                  <span className="text-xs font-mono font-bold text-[#F5F7FF] group-hover:text-[#66DAD5]">
+                    f(n) = g(n) + h(n)
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#66DAD5]/15 text-[#66DAD5] font-bold">
+                  Inspect
                 </span>
-                <div className="text-center py-1.5 bg-[#1C2844] rounded-lg border border-[#2B3B5B]/80 font-mono text-xs font-bold text-[#F5F7FF]">
-                  f(n) = g(n) + h(n)
-                </div>
-                <div className="grid grid-cols-3 gap-1.5 mt-2 text-center">
-                  <div className="bg-[#151F36] p-1 rounded border border-[#2B3B5B]">
-                    <span className="text-[9px] text-[#A1ADC7] block">g(n)</span>
-                    <span className="text-xs font-mono font-bold text-[#6FAFFF]">
-                      {telemetry.g.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="bg-[#151F36] p-1 rounded border border-[#2B3B5B]">
-                    <span className="text-[9px] text-[#A1ADC7] block">h(n)</span>
-                    <span className="text-xs font-mono font-bold text-[#A695F2]">
-                      {telemetry.h.toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="bg-[#151F36] p-1 rounded border border-[#66DAD5]/40">
-                    <span className="text-[9px] text-[#66DAD5] font-semibold block">f(n)</span>
-                    <span className="text-xs font-mono font-bold text-[#66DAD5]">
-                      {telemetry.f.toFixed(1)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+              </button>
 
-              {/* Standardized Metrics Cards */}
+              {/* Standardized Clear Metrics */}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase">
                   Mission Progression
@@ -904,14 +927,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
 
                 <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                  <span className="text-[#A1ADC7]">Traversed Cost:</span>
+                  <span className="text-[#A1ADC7]">Executed Traversal Cost:</span>
                   <span className="font-mono font-bold text-[#86E3B4]">
                     {telemetry.executedCost.toFixed(2)}
                   </span>
                 </div>
 
                 <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                  <span className="text-[#A1ADC7]">Remaining Cost:</span>
+                  <span className="text-[#A1ADC7]">Remaining Planned Cost:</span>
                   <span className="font-mono font-bold text-[#F5CF79]">
                     {telemetry.remainingCost.toFixed(2)}
                   </span>
@@ -925,21 +948,21 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </div>
 
                 <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                  <span className="text-[#A1ADC7]">Nodes Explored:</span>
+                  <span className="text-[#A1ADC7]">Search Nodes Evaluated:</span>
                   <span className="font-mono font-bold text-[#A695F2]">
                     {telemetry.nodesExpanded}
                   </span>
                 </div>
 
                 <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                  <span className="text-[#A1ADC7]">Replans:</span>
+                  <span className="text-[#A1ADC7]">Replanning Events:</span>
                   <span className="font-mono font-bold text-[#FF9B83]">
                     {telemetry.replans}
                   </span>
                 </div>
 
                 <div className="bg-[#151F36] px-2.5 py-1.5 rounded-lg border border-[#2B3B5B] flex items-center justify-between text-xs">
-                  <span className="text-[#A1ADC7]">Search Time:</span>
+                  <span className="text-[#A1ADC7]">Search Compute Time:</span>
                   <span className="font-mono font-bold text-[#A1ADC7]">
                     {telemetry.executionTimeMs.toFixed(2)} ms
                   </span>
@@ -1032,6 +1055,76 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Algorithm Analysis Modal (Clutter reduction + Pure Math clarity) */}
+      {analysisModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-[#1C2844] border border-[#3E527D] rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#2B3B5B] pb-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-[#66DAD5]" />
+                <h3 className="text-base font-bold text-[#F5F7FF] tracking-wide">
+                  A* HEURISTIC EVALUATION
+                </h3>
+              </div>
+              <button
+                onClick={() => setAnalysisModalOpen(false)}
+                className="p-1 rounded-lg text-[#A1ADC7] hover:text-[#F5F7FF] hover:bg-[#253554] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-[#151F36] rounded-xl p-4 border border-[#2B3B5B] text-center space-y-2">
+              <span className="text-[10px] font-mono font-bold text-[#66DAD5] uppercase tracking-wider block">
+                Total Estimated Evaluation Function
+              </span>
+              <div className="text-lg font-mono font-extrabold text-[#F5F7FF] tracking-wider py-1 bg-[#1C2844] rounded-lg border border-[#2B3B5B]">
+                f(n) = g(n) + h(n)
+              </div>
+              <div className="grid grid-cols-3 gap-2 pt-2 text-center">
+                <div className="bg-[#1C2844] p-2 rounded-lg border border-[#2B3B5B]">
+                  <span className="text-[10px] font-mono text-[#A1ADC7] block uppercase">g(n) (Exact)</span>
+                  <span className="text-sm font-mono font-bold text-[#6FAFFF]">
+                    {telemetry.g.toFixed(1)}
+                  </span>
+                </div>
+                <div className="bg-[#1C2844] p-2 rounded-lg border border-[#2B3B5B]">
+                  <span className="text-[10px] font-mono text-[#A1ADC7] block uppercase">h(n) (Heuristic)</span>
+                  <span className="text-sm font-mono font-bold text-[#A695F2]">
+                    {telemetry.h.toFixed(1)}
+                  </span>
+                </div>
+                <div className="bg-[#1C2844] p-2 rounded-lg border border-[#66DAD5]/40">
+                  <span className="text-[10px] font-mono text-[#66DAD5] font-semibold block uppercase">f(n) (Total)</span>
+                  <span className="text-sm font-mono font-bold text-[#66DAD5]">
+                    {telemetry.f.toFixed(1)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-[#A1ADC7] leading-relaxed">
+              <p>
+                <strong className="text-[#6FAFFF]">Exact Cost g(n):</strong> Accumulated movement cost from Start cell ({gridModel.start.r}, {gridModel.start.c}) to the evaluated node. Orthogonal step = 1.0, diagonal = √2, rough terrain = 3.0×.
+              </p>
+              <p>
+                <strong className="text-[#A695F2]">Heuristic Estimate h(n):</strong> Admissible estimation from node ({telemetry.r}, {telemetry.c}) to Target ({gridModel.target.r}, {gridModel.target.c}).
+              </p>
+              <p className="bg-[#151F36] p-2.5 rounded-lg border border-[#2B3B5B] text-[11px]">
+                <strong className="text-[#86E3B4]">Admissibility Theorem:</strong> Because h(n) ≤ h*(n) (the true optimal cost) without heuristic inflation (weight = 1.00), A* is mathematically guaranteed to return an optimal path equivalent to Dijkstra, while exploring significantly fewer nodes.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setAnalysisModalOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] text-[#151F36] font-bold text-xs uppercase tracking-wider hover:opacity-95 transition-opacity"
+            >
+              Resume Mission
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

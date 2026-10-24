@@ -45,7 +45,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Project Aegis
             </span>
             <span className="hidden sm:inline-block text-[10px] bg-[#66DAD5]/15 text-[#66DAD5] px-1.5 py-0.5 rounded font-mono font-semibold border border-[#66DAD5]/30">
-              A* V3
+              A* V4
             </span>
           </div>
           <span className="hidden sm:block text-[10px] text-[#A1ADC7] tracking-wider">
@@ -61,6 +61,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             sound.playClick();
             onSelectScreen('missions');
           }}
+          data-nav-item="missions"
           title="Missions"
           className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'missions' || currentScreen === 'game'
@@ -77,6 +78,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             sound.playClick();
             onSelectScreen('arena');
           }}
+          data-nav-item="arena"
           title="Algorithm Arena"
           className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'arena'
@@ -93,6 +95,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             sound.playClick();
             onSelectScreen('academy');
           }}
+          data-nav-item="academy"
           title="Algorithm Academy"
           className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'academy'
@@ -109,6 +112,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             sound.playClick();
             onSelectScreen('presentation');
           }}
+          data-nav-item="presentation"
           title="Presentation Mode"
           className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'presentation'
