@@ -555,13 +555,13 @@ export class AegisRenderer {
     ctx.strokeStyle = `rgba(102, 218, 213, ${alpha * 0.7})`;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(this.scannerCenter.x, this.scannerCenter.y, this.scannerRadius, 0, Math.PI * 2);
+    ctx.arc(this.scannerCenter.x, this.scannerCenter.y, Math.max(0.1, this.scannerRadius), 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.strokeStyle = `rgba(245, 207, 121, ${alpha * 0.4})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.arc(this.scannerCenter.x, this.scannerCenter.y, Math.max(1, this.scannerRadius * 0.65), 0, Math.PI * 2);
+    ctx.arc(this.scannerCenter.x, this.scannerCenter.y, Math.max(0.1, this.scannerRadius * 0.65), 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -1052,8 +1052,18 @@ export class AegisRenderer {
 
   private roundRect(x: number, y: number, w: number, h: number, r: number): void {
     const { ctx } = this;
+    w = Math.max(0, w);
+    h = Math.max(0, h);
+    r = Math.max(0, r);
     if (w < 2 * r) r = w / 2;
     if (h < 2 * r) r = h / 2;
+    r = Math.max(0, r);
+    if (r <= 0) {
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.closePath();
+      return;
+    }
     ctx.beginPath();
     ctx.moveTo(x + r, y);
     ctx.arcTo(x + w, y, x + w, y + h, r);
