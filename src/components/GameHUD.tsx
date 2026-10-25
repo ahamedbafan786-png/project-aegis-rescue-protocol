@@ -988,30 +988,35 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 sound.playClick();
                 setActiveDrawer('TOOLS');
               }}
-              className="absolute top-3 left-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#66DAD5] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
+              aria-label="Open Tools Drawer"
+              className="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 z-20 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#66DAD5] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all select-none"
             >
-              <Settings2 className="w-3.5 h-3.5" />
-              <span>Tools [T]</span>
+              <Settings2 className="w-3.5 h-3.5 shrink-0" />
+              <span>Tools<span className="hidden sm:inline"> [T]</span></span>
             </button>
           )}
 
           {/* Persistent Mobile / Challenge Repair Energy Counter */}
-          {mission.repairCharges !== undefined && !leftDockOpen && (
+          {mission.repairCharges !== undefined && !leftDockOpen && !rightDockOpen && (
             <div
               data-testid="mobile-repair-counter"
-              className={`absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full border shadow-xl backdrop-blur-md flex items-center gap-2 font-mono text-xs font-bold transition-all ${
+              role="status"
+              aria-label={`Repair Charges: ${repairCharges} of ${mission.repairCharges}`}
+              title={`Repair Energy: ${repairCharges} / ${mission.repairCharges}`}
+              className={`absolute top-2.5 sm:top-3 left-1/2 -translate-x-1/2 z-20 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full border shadow-xl backdrop-blur-md flex items-center gap-1.5 sm:gap-2 font-mono text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap select-none pointer-events-auto ${
                 repairCharges > 0
                   ? 'bg-[#1C2844]/95 border-[#F5CF79]/80 text-[#F5CF79] shadow-[#F5CF79]/20'
                   : 'bg-[#1C2844]/95 border-[#FF9B83]/60 text-[#FF9B83]'
               }`}
             >
-              <Hammer className={`w-3.5 h-3.5 ${repairCharges > 0 ? 'text-[#F5CF79]' : 'text-[#FF9B83]'}`} />
-              <span>REPAIR ENERGY: {repairCharges} / {mission.repairCharges}</span>
+              <Hammer className={`w-3 sm:w-3.5 h-3 sm:h-3.5 shrink-0 ${repairCharges > 0 ? 'text-[#F5CF79]' : 'text-[#FF9B83]'}`} />
+              <span className="hidden md:inline">REPAIR ENERGY: </span>
+              <span className="tabular-nums font-extrabold">{repairCharges}/{mission.repairCharges}</span>
               <div className="flex items-center gap-1">
                 {Array.from({ length: mission.repairCharges }).map((_, i) => (
                   <span
                     key={i}
-                    className={`w-2 h-2 rounded-full transition-all ${
+                    className={`w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full transition-all shrink-0 ${
                       i < repairCharges
                         ? 'bg-[#F5CF79] shadow-sm shadow-[#F5CF79]'
                         : 'bg-[#2B3B5B] border border-[#3E527D]'
@@ -1028,10 +1033,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 sound.playClick();
                 setActiveDrawer('TELEMETRY');
               }}
-              className="absolute top-3 right-3 z-20 px-3 py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#6FAFFF] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all"
+              aria-label="Open Telemetry Drawer"
+              className="absolute top-2.5 sm:top-3 right-2.5 sm:right-3 z-20 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-[#1C2844]/90 hover:bg-[#253554] border border-[#2B3B5B] text-xs font-mono text-[#6FAFFF] flex items-center gap-1.5 shadow-lg backdrop-blur-md transition-all select-none"
             >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Telemetry [M]</span>
+              <Layers className="w-3.5 h-3.5 shrink-0" />
+              <span>Telemetry<span className="hidden sm:inline"> [M]</span></span>
             </button>
           )}
         </div>

@@ -147,8 +147,14 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
       robot.update(deltaSec, 1.25); // Comfortable presentation speed
 
       // Presenter Auto-Hold: pauses inside the demo window so the presenter never misses the blockage
+      // (Only activates if demo blockage has not already been triggered pre-deployment)
+      const isDemoBlockagePresentInGrid =
+        mission.demoBlockageCoord &&
+        isTileBlocked(gridModelRef.current.tiles[mission.demoBlockageCoord.r][mission.demoBlockageCoord.c]);
+
       if (
         holdAtWindow &&
+        !isDemoBlockagePresentInGrid &&
         robot.state === 'MOVING' &&
         robot.logicalPos.r === 5 &&
         robot.logicalPos.c >= 4 &&
@@ -313,6 +319,33 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 16);
     rendererRef.current?.triggerBlockageVisual(blockCoord, activePath, robot.logicalPos);
 
+    const isPreDeployment =
+      (robot.state === 'IDLE' || robot.state === 'CONFIRMED') &&
+      robot.stepsTaken === 0 &&
+      !hasAutoHeldRef.current;
+
+    if (isPreDeployment) {
+      // Pre-deployment planning: calculate new path around the collapse,
+      // update path and visual display, but DO NOT start moving or increment replan counter.
+      const newPlan = computeRoute(robot.logicalPos, nextModel.tiles);
+      if (newPlan.found) {
+        setActivePath(newPlan.path);
+        robot.setPath(newPlan.path, newPlan.totalCost);
+        // Retain ready-to-deploy state at start
+        robot.state = 'IDLE';
+        robot.statusMessage = 'BYPASS ROUTE LOCKED — PRESS DEPLOY';
+        setRobotState('IDLE');
+        setStatusMessage('BYPASS ROUTE LOCKED — PRESS DEPLOY');
+      } else {
+        robot.state = 'FAILED';
+        robot.statusMessage = 'NO SAFE ROUTE AVAILABLE';
+        setRobotState('FAILED');
+        setStatusMessage('NO SAFE ROUTE AVAILABLE');
+        sound.playFailed();
+      }
+      return;
+    }
+
     const isBlocked = robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
 
     // If blockage invalidated path, clear auto-hold state and ensure moving state
@@ -323,8 +356,16 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     }
   };
 
+  const isDemoBlockagePresent =
+    mission.demoBlockageCoord !== undefined &&
+    isTileBlocked(gridModel.tiles[mission.demoBlockageCoord.r][mission.demoBlockageCoord.c]);
+
   // Pre-deploy state: robot at start, not yet deployed
-  const isPreDeploy = robotState === 'IDLE' && telemetry.stepsTaken === 0 && telemetry.replans === 0;
+  const isPreDeploy =
+    (robotState === 'IDLE' || robotState === 'CONFIRMED') &&
+    telemetry.stepsTaken === 0 &&
+    telemetry.replans === 0 &&
+    !hasAutoHeldRef.current;
 
   // Demo window detection: while moving through transit conduit or paused in auto-hold
   const isInDemoWindow =
@@ -349,9 +390,13 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   if (robotState === 'ARRIVED') {
     statusBadgeColor = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4]';
     statusBadgeDot = 'bg-[#86E3B4]';
-    displayStatus = isDetourActive
+    displayStatus = isDetourActive || isDemoBlockagePresent
       ? 'RESCUE COMPLETE · DETOUR SUCCESSFUL'
       : 'RESCUE COMPLETE · DESTINATION REACHED';
+  } else if (isPreDeploy && isDemoBlockagePresent) {
+    statusBadgeColor = 'bg-[#86E3B4]/25 border-[#86E3B4] text-[#86E3B4]';
+    statusBadgeDot = 'bg-[#86E3B4]';
+    displayStatus = 'BYPASS ROUTE LOCKED — READY TO DEPLOY';
   } else if (hasAutoHeldRef.current && robotState === 'IDLE' && telemetry.replans === 0) {
     statusBadgeColor = 'bg-[#FF9B83]/25 border-[#FF9B83] text-[#FF9B83] animate-pulse';
     statusBadgeDot = 'bg-[#FF9B83] animate-ping';
@@ -391,6 +436,17 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
       <>
         <Sparkles className="w-4 h-4 text-[#86E3B4]" />
         <span>DEMO COMPLETE</span>
+      </>
+    );
+  } else if (isPreDeploy && isDemoBlockagePresent) {
+    // Pre-deployment collapse already triggered: bypass is calculated and locked
+    triggerButtonDisabled = true;
+    triggerButtonClass = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4] cursor-default';
+    triggerButtonTitle = 'Bypass route locked around collapse at (5, 10). Click Deploy Robot to begin transit.';
+    triggerButtonContent = (
+      <>
+        <Sparkles className="w-4 h-4 text-[#86E3B4]" />
+        <span>BYPASS LOCKED</span>
       </>
     );
   } else if (isInDemoWindow) {

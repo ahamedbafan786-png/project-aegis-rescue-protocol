@@ -242,6 +242,30 @@ async function runAcceptanceSuite() {
     if (!preDeployTriggerBtn) throw new Error('Trigger Collapse button not found before deploy');
     await preDeployTriggerBtn.click();
     console.log('  -> Trigger Collapse pressed BEFORE Deploy!');
+    await new Promise((r) => setTimeout(r, 400));
+
+    // Verify robot remains stationary at start position (0 steps, 0 replans, deploy button says Deploy Robot)
+    const preDeployStationary = await page.evaluate(() => {
+      const stepsEl = document.querySelector('[data-telemetry="steps"]');
+      const replansEl = document.querySelector('[data-telemetry="replans"]');
+      const deployBtn = document.querySelector('[data-deploy-button]');
+      const steps = stepsEl ? stepsEl.innerText.trim() : '';
+      const replans = replansEl ? replansEl.innerText.trim() : '';
+      const deployText = deployBtn ? deployBtn.innerText.toUpperCase() : '';
+      return steps === '0' && replans === '0' && deployText.includes('DEPLOY ROBOT');
+    });
+    console.log(`  -> Robot remains stationary before Deploy: ${preDeployStationary}`);
+    if (!preDeployStationary) throw new Error('Robot unexpectedly started moving before Deploy was clicked!');
+
+    const shotPreDeploy = path.join(screenshotsDir, 'v4_2_2_pre_deploy_collapse_presentation.png');
+    await page.screenshot({ path: shotPreDeploy });
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
+      fs.copyFileSync(shotPreDeploy, path.join(artifactsDir, 'v4_2_2_pre_deploy_collapse_presentation.png'));
+    }
+
+    // Explicitly click Deploy Robot to initiate movement
+    await page.click('[data-deploy-button]');
+    console.log('  -> Explicitly clicked Deploy Robot after pre-deploy collapse!');
 
     // Wait for detour transit to complete
     let preDeployDone = false;
@@ -464,47 +488,88 @@ async function runAcceptanceSuite() {
     await page.waitForSelector('[data-mission-card="mission-challenge-1"]', { timeout: 6000 });
 
     // -------------------------------------------------------------------------
-    // SCENARIO 9: PERSISTENT MOBILE REPAIR COUNTER (390x844 & 543x589)
+    // SCENARIO 9: PERSISTENT MOBILE REPAIR COUNTER & BOUNDING BOX NON-OVERLAP VERIFICATION
     // -------------------------------------------------------------------------
-    console.log('\n[SCENARIO 9] Verifying Persistent Mobile Repair Counter...');
+    console.log('\n[SCENARIO 9] Verifying Persistent Mobile Repair Counter & Multi-Viewport Layout...');
     await page.setViewport({ width: 390, height: 844 });
     await new Promise((r) => setTimeout(r, 400));
     await page.click('[data-mission-card="mission-challenge-1"]');
     await page.waitForSelector('[data-testid="mobile-repair-counter"]', { timeout: 6000 });
 
-    // Verify mobile repair counter element exists and is visible when drawers are closed
-    const mobileCounterVisible = await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="mobile-repair-counter"]');
-      if (!el) return false;
-      const rect = el.getBoundingClientRect();
-      return rect.width > 0 && rect.height > 0 && el.innerText.includes('REPAIR ENERGY: 2 / 2');
-    });
-    console.log(`  -> Mobile 390x844: [data-testid="mobile-repair-counter"] visible: ${mobileCounterVisible}`);
-    if (!mobileCounterVisible) throw new Error('Mobile repair counter not visible at 390x844 with drawers closed');
+    // Test responsive bounding box clearance across all required widths: 320, 360, 375, 390, 430, 543
+    const testWidths = [320, 360, 375, 390, 430, 543];
+    for (const w of testWidths) {
+      await page.setViewport({ width: w, height: 800 });
+      await new Promise((r) => setTimeout(r, 300));
 
+      const layoutCheck = await page.evaluate((width) => {
+        const counterEl = document.querySelector('[data-testid="mobile-repair-counter"]');
+        if (!counterEl) return { ok: false, reason: 'counter missing' };
+        const counterRect = counterEl.getBoundingClientRect();
+
+        const allButtons = Array.from(document.querySelectorAll('button'));
+        const toolsBtn = document.querySelector('[aria-label="Open Tools Drawer"]') || allButtons.find((b) => b.innerText.includes('Tools'));
+        const telBtn = document.querySelector('[aria-label="Open Telemetry Drawer"]') || allButtons.find((b) => b.innerText.includes('Telemetry'));
+
+        if (!toolsBtn || !telBtn) return { ok: false, reason: 'dock toggle buttons missing' };
+
+        const toolsRect = toolsBtn.getBoundingClientRect();
+        const telRect = telBtn.getBoundingClientRect();
+
+        const clearanceLeft = counterRect.left - toolsRect.right;
+        const clearanceRight = telRect.left - counterRect.right;
+        const noOverlap = clearanceLeft >= 0 && clearanceRight >= 0;
+        const isSingleLine = counterRect.height <= 40; // No vertical multi-line wrap
+        const text = counterEl.innerText || counterEl.textContent || '';
+        const hasCounterText = text.includes('2/2') || text.includes('2 / 2');
+
+        return {
+          ok: noOverlap && isSingleLine && hasCounterText,
+          width,
+          clearanceLeft: Math.round(clearanceLeft),
+          clearanceRight: Math.round(clearanceRight),
+          counterWidth: Math.round(counterRect.width),
+          counterHeight: Math.round(counterRect.height),
+          text: text.trim(),
+        };
+      }, w);
+
+      console.log(`  -> Width ${w}px: Clearance (L:${layoutCheck.clearanceLeft}px, R:${layoutCheck.clearanceRight}px), Height: ${layoutCheck.counterHeight}px, Text: "${layoutCheck.text}" | Pass: ${layoutCheck.ok}`);
+      if (!layoutCheck.ok) {
+        throw new Error(`Mobile repair counter layout failure at ${w}px width: clearanceL=${layoutCheck.clearanceLeft}, clearanceR=${layoutCheck.clearanceRight}`);
+      }
+    }
+
+    // Save screenshots at required test viewports
+    await page.setViewport({ width: 390, height: 844 });
+    await new Promise((r) => setTimeout(r, 300));
     const shot7 = path.join(screenshotsDir, 'v4_2_1_07_mobile_repair_counter_390x844.png');
     await page.screenshot({ path: shot7 });
     if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot7, path.join(artifactsDir, 'v4_2_1_07_mobile_repair_counter_390x844.png'));
     }
 
-    // Test scaling at 543x589
     await page.setViewport({ width: 543, height: 589 });
-    await new Promise((r) => setTimeout(r, 400));
-    const counterAt543 = await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="mobile-repair-counter"]');
-      return el !== null && el.innerText.includes('REPAIR ENERGY: 2 / 2');
-    });
-    console.log(`  -> Mobile 543x589: counter visible: ${counterAt543}`);
-    if (!counterAt543) throw new Error('Mobile repair counter not visible at 543x589');
-
+    await new Promise((r) => setTimeout(r, 300));
     const shot8 = path.join(screenshotsDir, 'v4_2_1_08_mobile_repair_counter_543x589.png');
     await page.screenshot({ path: shot8 });
     if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot8, path.join(artifactsDir, 'v4_2_1_08_mobile_repair_counter_543x589.png'));
     }
 
-    // Verify counter hides when Tools drawer is open (no duplicate)
+    await page.setViewport({ width: 320, height: 650 });
+    await new Promise((r) => setTimeout(r, 300));
+    const shot320 = path.join(screenshotsDir, 'v4_2_2_mobile_repair_counter_320px.png');
+    await page.screenshot({ path: shot320 });
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
+      fs.copyFileSync(shot320, path.join(artifactsDir, 'v4_2_2_mobile_repair_counter_320px.png'));
+    }
+
+    // Return to 390x844 and test repair charge dynamic transitions: 2 -> 1 -> 0
+    await page.setViewport({ width: 390, height: 844 });
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Verify counter hides when Tools drawer is open
     await clickButtonWithText(page, 'Tools');
     await new Promise((r) => setTimeout(r, 300));
     const counterHiddenWhenToolsOpen = await page.evaluate(() => {
@@ -514,7 +579,50 @@ async function runAcceptanceSuite() {
     console.log(`  -> Floating counter hides when Tools drawer is open: ${counterHiddenWhenToolsOpen}`);
     if (!counterHiddenWhenToolsOpen) throw new Error('Floating repair counter duplicates when Tools drawer is open');
 
-    report.push({ test: 'Scenario 9: Persistent Mobile Repair Counter (390x844 & 543x589)', pass: true });
+    // Close Tools drawer
+    const closeBtn = await page.$('button[aria-label="Close drawer"]');
+    if (closeBtn) await closeBtn.click();
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Verify counter reappears
+    const counterReappeared = await page.evaluate(() => document.querySelector('[data-testid="mobile-repair-counter"]') !== null);
+    console.log(`  -> Floating counter reappears when drawer closes: ${counterReappeared}`);
+    if (!counterReappeared) throw new Error('Floating repair counter did not reappear after closing drawer');
+
+    // Test changing charges from 2 -> 1 -> 0 on mobile viewport 390x844 (Challenge 1: cols: 21, rows: 11, debris at (8,5) and (12,5))
+    console.log('  -> Testing mobile repair counter transitions (2 -> 1 -> 0)...');
+    const mobileDebris1 = await getGridClickCoords(page, 8, 5, 21, 11);
+    await page.mouse.click(mobileDebris1.x, mobileDebris1.y);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const counterAt1 = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="mobile-repair-counter"]');
+      const text = el ? (el.innerText || el.textContent || '') : '';
+      return text.includes('1/2') || text.includes('1 / 2');
+    });
+    console.log(`  -> Mobile counter updated to 1/2: ${counterAt1}`);
+    if (!counterAt1) throw new Error('Mobile counter did not update to 1/2 after first debris breach');
+
+    const mobileDebris2 = await getGridClickCoords(page, 12, 5, 21, 11);
+    await page.mouse.click(mobileDebris2.x, mobileDebris2.y);
+    await new Promise((r) => setTimeout(r, 400));
+
+    const counterAt0 = await page.evaluate(() => {
+      const el = document.querySelector('[data-testid="mobile-repair-counter"]');
+      const text = el ? (el.innerText || el.textContent || '') : '';
+      return text.includes('0/2') || text.includes('0 / 2');
+    });
+    console.log(`  -> Mobile counter updated to 0/2: ${counterAt0}`);
+    if (!counterAt0) throw new Error('Mobile counter did not update to 0/2 after second debris breach');
+
+    // Screenshot of 0 charges state on 390x844
+    const shot0Charges = path.join(screenshotsDir, 'v4_2_2_mobile_repair_counter_0charges_390x844.png');
+    await page.screenshot({ path: shot0Charges });
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
+      fs.copyFileSync(shot0Charges, path.join(artifactsDir, 'v4_2_2_mobile_repair_counter_0charges_390x844.png'));
+    }
+
+    report.push({ test: 'Scenario 9: Persistent Mobile Repair Counter & Multi-Viewport Non-Overlap (320-543px)', pass: true });
 
     // -------------------------------------------------------------------------
     // SCENARIO 10: SANDBOX LAB EDITING REMAINS FULLY UNRESTRICTED
