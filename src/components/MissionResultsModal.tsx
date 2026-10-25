@@ -82,15 +82,18 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
         {/* Subtle background glow */}
         <div className="absolute -top-24 w-48 h-48 bg-[#66DAD5]/20 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Victory Icon */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#66DAD5] to-[#6FAFFF] flex items-center justify-center shadow-lg shadow-[#66DAD5]/30 mb-4">
-          <Award className="w-9 h-9 text-[#17233D]" />
+        {/* Survivor Rescue Hero Badge */}
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#86E3B4] to-[#66DAD5] flex items-center justify-center shadow-xl shadow-[#86E3B4]/30 mb-3 relative">
+          <span className="text-3xl text-[#17233D] font-extrabold select-none">✚</span>
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#86E3B4] border-2 border-[#1C2844] animate-ping" />
         </div>
 
-        <span className="text-xs font-mono font-bold tracking-widest text-[#66DAD5] uppercase">
-          Protocol Succeeded
-        </span>
-        <h2 className="text-2xl font-black text-[#F5F7FF] tracking-tight mt-1">
+        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#86E3B4]/15 border border-[#86E3B4]/40 text-[#86E3B4] text-[11px] font-mono font-bold tracking-wider uppercase mb-1">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>Survivor Secured &amp; Evacuated</span>
+        </div>
+
+        <h2 className="text-2xl font-black text-[#F5F7FF] tracking-tight mt-0.5">
           RESCUE MISSION COMPLETE
         </h2>
 

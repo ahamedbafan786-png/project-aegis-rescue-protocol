@@ -101,6 +101,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   const [statusMessage, setStatusMessage] = useState<string>('SYSTEM STANDBY');
   const [activePath, setActivePath] = useState<GridCoord[]>([]);
   const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [rescueSeqActive, setRescueSeqActive] = useState<boolean>(false);
+  const rescueTimerRef = useRef<number>(0);
+  const rescueCompletedRef = useRef<boolean>(false);
 
   // Telemetry
   const [telemetry, setTelemetry] = useState({
@@ -224,15 +227,44 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       robot.update(deltaSec, speedMultiplier);
 
       // Check if robot arrived
-      if (robot.state === 'ARRIVED' && robotState !== 'ARRIVED') {
-        setRobotState('ARRIVED');
-        setStatusMessage('MISSION ACCOMPLISHED');
-        rendererRef.current?.addArrivalBurst(gridModel.target.r, gridModel.target.c);
-        onMissionComplete({
-          steps: robot.stepsTaken,
-          replans: robot.replansCount,
-          cost: robot.executedCost,
-        });
+      if (robot.state === 'ARRIVED' && !rescueCompletedRef.current) {
+        if (speedMultiplier >= 100) {
+          rescueCompletedRef.current = true;
+          setRobotState('ARRIVED');
+          setStatusMessage('MISSION ACCOMPLISHED');
+          rendererRef.current?.addArrivalBurst(gridModel.target.r, gridModel.target.c);
+          onMissionComplete({
+            steps: robot.stepsTaken,
+            replans: robot.replansCount,
+            cost: robot.executedCost,
+          });
+        } else if (!rescueSeqActive) {
+          setRescueSeqActive(true);
+          rescueTimerRef.current = 0;
+          setStatusMessage('SURVIVOR CONTACT — COMMENCING RESCUE PROTOCOL');
+          sound.playScan();
+          rendererRef.current?.triggerRescueSequence(gridModel.target);
+        } else {
+          rescueTimerRef.current += deltaSec;
+          if (rescueTimerRef.current >= 0.5 && rescueTimerRef.current - deltaSec < 0.5) {
+            setStatusMessage('MEDICAL LINK ESTABLISHED — STABILIZING VITALS');
+          }
+          if (rescueTimerRef.current >= 0.9 && rescueTimerRef.current - deltaSec < 0.9) {
+            sound.playRescueSuccess();
+            setStatusMessage('VITALS OPTIMAL — SURVIVOR SECURED');
+          }
+          if (rescueTimerRef.current >= 1.4) {
+            rescueCompletedRef.current = true;
+            setRescueSeqActive(false);
+            setRobotState('ARRIVED');
+            setStatusMessage('MISSION ACCOMPLISHED');
+            onMissionComplete({
+              steps: robot.stepsTaken,
+              replans: robot.replansCount,
+              cost: robot.executedCost,
+            });
+          }
+        }
       }
 
       // Render Canvas with Sector Theme
@@ -294,6 +326,33 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     };
   }, [calculatePath]);
 
+  // Skip Rescue Sequence Handler
+  const handleSkipRescue = useCallback(() => {
+    if (rescueSeqActive && !rescueCompletedRef.current) {
+      rescueCompletedRef.current = true;
+      setRescueSeqActive(false);
+      setRobotState('ARRIVED');
+      setStatusMessage('MISSION ACCOMPLISHED');
+      rendererRef.current?.skipRescueSequence();
+      onMissionComplete({
+        steps: robotRef.current.stepsTaken,
+        replans: robotRef.current.replansCount,
+        cost: robotRef.current.executedCost,
+      });
+    }
+  }, [rescueSeqActive, onMissionComplete]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && rescueSeqActive) {
+        e.preventDefault();
+        handleSkipRescue();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [rescueSeqActive, handleSkipRescue]);
+
   // Deploy / Pause Handler
   const handleToggleDeploy = () => {
     const robot = robotRef.current;
@@ -309,6 +368,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     } else if (robot.state === 'MOVING') {
       robot.pause();
     } else if (robot.state === 'ARRIVED' || robot.state === 'FAILED') {
+      rescueCompletedRef.current = false;
+      setRescueSeqActive(false);
+      rendererRef.current?.resetVisualEffects();
       // Clean authoritative replay
       if (onReplay) {
         onReplay();
@@ -323,6 +385,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   // Reset Simulation Handler
   const handleReset = () => {
     sound.playClick();
+    rescueCompletedRef.current = false;
+    setRescueSeqActive(false);
+    rendererRef.current?.resetVisualEffects();
     if (onReplay) {
       onReplay();
       return;
@@ -493,7 +558,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         );
         rendererRef.current.addArrivalBurst(coord.r, coord.c);
         rendererRef.current.addDustParticles(coord.r, coord.c, 16);
-        sound.playDeploy();
+        sound.playDemolish();
       }
     } else if (activeTool === 'start') {
       changed = nextModel.setStart(coord.r, coord.c);
@@ -546,6 +611,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (rescueSeqActive) {
+      handleSkipRescue();
+      return;
+    }
     setIsDrawing(true);
     handleApplyToolFromCoords(e.clientX, e.clientY);
   };
@@ -570,6 +639,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   };
 
   const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (rescueSeqActive) {
+      handleSkipRescue();
+      return;
+    }
     if (e.touches.length > 0) {
       const touch = e.touches[0];
       handleApplyToolFromCoords(touch.clientX, touch.clientY);
@@ -1039,6 +1112,21 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <Layers className="w-3.5 h-3.5 shrink-0" />
               <span>Telemetry<span className="hidden sm:inline"> [M]</span></span>
             </button>
+          )}
+
+          {/* Active Rescue Sequence Cinematic Banner & Skip Prompt */}
+          {rescueSeqActive && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-[#1C2844]/95 border border-[#86E3B4]/60 text-xs font-mono text-[#86E3B4] shadow-2xl backdrop-blur-md select-none pointer-events-auto">
+              <span className="w-2 h-2 rounded-full bg-[#86E3B4] animate-ping" />
+              <span className="font-bold">RESCUE PROTOCOL ENGAGED</span>
+              <button
+                onClick={handleSkipRescue}
+                title="Skip rescue animation"
+                className="ml-1.5 px-2.5 py-0.5 rounded-full bg-[#86E3B4] text-[#17233D] font-extrabold text-[10px] tracking-wider uppercase hover:bg-[#a0ecc4] transition-colors"
+              >
+                Skip ▶
+              </button>
+            </div>
           )}
         </div>
 

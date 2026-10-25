@@ -41,6 +41,7 @@ export class AegisRenderer {
   private particles: RenderParticle[] = [];
   private trailPoints: TrailPoint[] = [];
   private pulsePhase: number = 0;
+  private treadTravelDist: number = 0;
 
   // Replanning visual storytelling
   private shockwaves: ReplanShockwave[] = [];
@@ -49,6 +50,12 @@ export class AegisRenderer {
   private scannerCenter: { x: number; y: number } | null = null;
   private scannerRadius: number = 0;
   private scannerMaxRadius: number = 0;
+
+  // Cinematic Rescue Sequence State
+  public rescueActive: boolean = false;
+  public rescueProgress: number = 0; // 0.0 to 1.0
+  public rescueTargetCoord: GridCoord | null = null;
+  private rescueCompleteNotified: boolean = false;
 
   public hoverCoord: GridCoord | null = null;
   public highlightedExplored: Set<string> = new Set();
@@ -173,8 +180,23 @@ export class AegisRenderer {
   }
 
   /**
-   * Resets all visual effects, shockwaves, invalidated path, and particles on simulation reset.
+   * Begins the satisfying cinematic rescue sequence when Aegis-1 reaches the survivor
    */
+  public triggerRescueSequence(target: GridCoord): void {
+    this.rescueActive = true;
+    this.rescueProgress = 0;
+    this.rescueTargetCoord = { ...target };
+    this.rescueCompleteNotified = false;
+
+    // Initial stabilization burst
+    this.addArrivalBurst(target.r, target.c);
+  }
+
+  public skipRescueSequence(): void {
+    this.rescueProgress = 1.0;
+    this.rescueActive = false;
+  }
+
   public resetVisualEffects(): void {
     this.particles = [];
     this.trailPoints = [];
@@ -186,6 +208,10 @@ export class AegisRenderer {
     this.scannerMaxRadius = 0;
     this.highlightedExplored.clear();
     this.highlightedOpen.clear();
+    this.rescueActive = false;
+    this.rescueProgress = 0;
+    this.rescueTargetCoord = null;
+    this.rescueCompleteNotified = false;
   }
 
   public render(
@@ -200,6 +226,14 @@ export class AegisRenderer {
     const height = this.canvas.height / (window.devicePixelRatio || 1);
 
     this.pulsePhase += deltaSec * 3.2;
+    if (robot.state === 'MOVING') {
+      this.treadTravelDist += deltaSec * 16;
+    }
+
+    // Update Rescue Sequence progress if active
+    if (this.rescueActive) {
+      this.rescueProgress = Math.min(1.0, this.rescueProgress + deltaSec * 0.7);
+    }
 
     // 1. Sector Backdrop
     this.renderEnvironmentBackdrop(width, height, theme);
@@ -210,10 +244,18 @@ export class AegisRenderer {
 
     // 2. Elevated Simulation Deck Plate
     ctx.save();
-    ctx.fillStyle = theme === 'facility' ? '#121A2B' : theme === 'canyon' ? '#181427' : '#141D33';
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-    ctx.shadowBlur = 36;
-    ctx.shadowOffsetY = 14;
+    const deckFill =
+      theme === 'facility'
+        ? '#121A2B'
+        : theme === 'canyon'
+        ? '#19132B'
+        : theme === 'maze'
+        ? '#0D1525'
+        : '#131D33';
+    ctx.fillStyle = deckFill;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+    ctx.shadowBlur = 38;
+    ctx.shadowOffsetY = 16;
     this.roundRect(this.offsetX - 8, this.offsetY - 8, boardW + 16, boardH + 16, 14);
     ctx.fill();
 
@@ -221,14 +263,25 @@ export class AegisRenderer {
     ctx.shadowColor = 'transparent';
     ctx.strokeStyle =
       theme === 'facility'
-        ? '#3A4E73'
+        ? '#41577F'
         : theme === 'canyon'
-        ? '#4E3A6B'
+        ? '#573F7A'
         : theme === 'maze'
-        ? '#33486E'
-        : '#2B3B5B';
+        ? '#3A5480'
+        : '#33486E';
     ctx.lineWidth = 2.5;
     this.roundRect(this.offsetX - 8, this.offsetY - 8, boardW + 16, boardH + 16, 14);
+    ctx.stroke();
+
+    // Inner subtle glow border
+    ctx.strokeStyle =
+      theme === 'canyon'
+        ? 'rgba(166, 149, 242, 0.22)'
+        : theme === 'facility'
+        ? 'rgba(245, 207, 121, 0.18)'
+        : 'rgba(102, 218, 213, 0.2)';
+    ctx.lineWidth = 1;
+    this.roundRect(this.offsetX - 6, this.offsetY - 6, boardW + 12, boardH + 12, 12);
     ctx.stroke();
     ctx.restore();
 
@@ -240,7 +293,7 @@ export class AegisRenderer {
         const tileType = gridModel.tiles[r][c];
         const key = `${r},${c}`;
 
-        this.renderTile(x, y, tileType, key, theme);
+        this.renderTile(x, y, tileType, key, theme, r, c);
       }
     }
 
@@ -281,27 +334,10 @@ export class AegisRenderer {
 
     // 10. Render Start Pad & Cryo-Stasis Rescue Pod
     this.renderStartPad(gridModel.start, theme);
-    this.renderRescuePod(gridModel.target, robot);
-
-    // Dynamic arrival sparkles when survivor is secured
-    if (robot.state === 'ARRIVED' && Math.random() < 0.28) {
-      const tcx = this.offsetX + gridModel.target.c * this.tileSize + this.tileSize / 2;
-      const tcy = this.offsetY + gridModel.target.r * this.tileSize + this.tileSize / 2;
-      this.particles.push({
-        x: tcx + (Math.random() - 0.5) * this.tileSize * 0.7,
-        y: tcy + (Math.random() - 0.5) * this.tileSize * 0.7,
-        vx: (Math.random() - 0.5) * 18,
-        vy: -Math.random() * 36 - 16,
-        size: Math.random() * 2.8 + 1.2,
-        color: '#86E3B4',
-        alpha: 0.95,
-        life: 0,
-        maxLife: 0.8,
-      });
-    }
+    this.renderRescuePod(gridModel.target, robot, theme);
 
     // Ambient sector atmosphere particles (crystal dust, sparks, or cyber motes)
-    if (this.particles.length < 24 && Math.random() < 0.12) {
+    if (this.particles.length < 28 && Math.random() < 0.15) {
       const px = this.offsetX + Math.random() * (gridModel.cols * this.tileSize);
       const py = this.offsetY + Math.random() * (gridModel.rows * this.tileSize);
       if (theme === 'canyon') {
@@ -309,36 +345,36 @@ export class AegisRenderer {
           x: px,
           y: py,
           vx: (Math.random() - 0.5) * 8,
-          vy: -Math.random() * 12 - 4,
-          size: Math.random() * 2.2 + 0.8,
+          vy: -Math.random() * 14 - 4,
+          size: Math.random() * 2.4 + 0.8,
           color: Math.random() > 0.5 ? '#A695F2' : '#C7BAFF',
           alpha: 0.65,
           life: 0,
-          maxLife: 1.8,
+          maxLife: 2.0,
         });
       } else if (theme === 'facility') {
         this.particles.push({
           x: px,
           y: py,
-          vx: (Math.random() - 0.5) * 14,
-          vy: Math.random() * 22 + 8,
-          size: Math.random() * 1.8 + 0.8,
+          vx: (Math.random() - 0.5) * 12,
+          vy: Math.random() * 20 + 6,
+          size: Math.random() * 2.0 + 0.8,
           color: Math.random() > 0.6 ? '#F5CF79' : '#FF9B83',
           alpha: 0.75,
           life: 0,
-          maxLife: 0.9,
+          maxLife: 1.1,
         });
       } else if (theme === 'maze') {
         this.particles.push({
           x: px,
           y: py,
           vx: (Math.random() - 0.5) * 6,
-          vy: -Math.random() * 10 - 2,
-          size: Math.random() * 1.8 + 0.8,
+          vy: -Math.random() * 12 - 2,
+          size: Math.random() * 2.0 + 0.8,
           color: '#66DAD5',
-          alpha: 0.55,
+          alpha: 0.6,
           life: 0,
-          maxLife: 1.5,
+          maxLife: 1.6,
         });
       }
     }
@@ -347,7 +383,7 @@ export class AegisRenderer {
     this.updateAndRenderTrail(robot, deltaSec);
 
     // 12. Render Hero Robot Character ("Aegis-1")
-    this.renderRobot(robot);
+    this.renderRobot(robot, theme);
 
     // 13. Update & Render Particle Systems
     this.updateAndRenderParticles(deltaSec);
@@ -360,20 +396,38 @@ export class AegisRenderer {
     // Deep theme-specific room tone
     const bgFill =
       theme === 'facility'
-        ? '#131926'
+        ? '#0D131F'
         : theme === 'canyon'
-        ? '#191526'
+        ? '#120E22'
         : theme === 'maze'
-        ? '#0D1524'
-        : '#151F36';
+        ? '#080E1B'
+        : '#0E1626';
     ctx.fillStyle = bgFill;
     ctx.fillRect(0, 0, w, h);
 
+    // Center ambient soft spotlight
+    const grad = ctx.createRadialGradient(w / 2, h / 2, 50, w / 2, h / 2, Math.max(w, h) * 0.7);
+    if (theme === 'canyon') {
+      grad.addColorStop(0, 'rgba(166, 149, 242, 0.12)');
+      grad.addColorStop(1, 'rgba(18, 14, 34, 0)');
+    } else if (theme === 'facility') {
+      grad.addColorStop(0, 'rgba(245, 207, 121, 0.08)');
+      grad.addColorStop(1, 'rgba(13, 19, 31, 0)');
+    } else if (theme === 'maze') {
+      grad.addColorStop(0, 'rgba(111, 175, 255, 0.1)');
+      grad.addColorStop(1, 'rgba(8, 14, 27, 0)');
+    } else {
+      grad.addColorStop(0, 'rgba(102, 218, 213, 0.1)');
+      grad.addColorStop(1, 'rgba(14, 22, 38, 0)');
+    }
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
     if (theme === 'training') {
-      // High-tech training proving ground grid with laser guides
-      ctx.strokeStyle = 'rgba(102, 218, 213, 0.08)';
+      // High-tech training proving ground grid with laser guides & station markers
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.07)';
       ctx.lineWidth = 1;
-      const step = 42;
+      const step = 44;
       for (let x = 0; x < w; x += step) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -386,16 +440,30 @@ export class AegisRenderer {
         ctx.lineTo(w, y);
         ctx.stroke();
       }
-      // Proving ground corner calibration marks
-      ctx.strokeStyle = 'rgba(111, 175, 255, 0.2)';
+
+      // Corner station brackets
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.28)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(16, 16, 32, 32);
-      ctx.strokeRect(w - 48, 16, 32, 32);
-      ctx.strokeRect(16, h - 48, 32, 32);
-      ctx.strokeRect(w - 48, h - 48, 32, 32);
+      const br = 24;
+      // Top-left
+      ctx.beginPath();
+      ctx.moveTo(16, 16 + br); ctx.lineTo(16, 16); ctx.lineTo(16 + br, 16);
+      ctx.stroke();
+      // Top-right
+      ctx.beginPath();
+      ctx.moveTo(w - 16 - br, 16); ctx.lineTo(w - 16, 16); ctx.lineTo(w - 16, 16 + br);
+      ctx.stroke();
+      // Bottom-left
+      ctx.beginPath();
+      ctx.moveTo(16, h - 16 - br); ctx.lineTo(16, h - 16); ctx.lineTo(16 + br, h - 16);
+      ctx.stroke();
+      // Bottom-right
+      ctx.beginPath();
+      ctx.moveTo(w - 16 - br, h - 16); ctx.lineTo(w - 16, h - 16); ctx.lineTo(w - 16, h - 16 - br);
+      ctx.stroke();
     } else if (theme === 'facility') {
-      // Collapsed facility: structural sub-grid & amber caution gridlines
-      ctx.strokeStyle = 'rgba(245, 207, 121, 0.07)';
+      // Collapsed facility: overhead structural steel I-beams & diagonal caution perimeter
+      ctx.strokeStyle = 'rgba(245, 207, 121, 0.06)';
       ctx.lineWidth = 1;
       const step = 48;
       for (let x = 0; x < w; x += step) {
@@ -410,32 +478,50 @@ export class AegisRenderer {
         ctx.lineTo(w, y);
         ctx.stroke();
       }
-      // Diagonal hazard stripes on upper/lower perimeter
-      ctx.fillStyle = 'rgba(245, 207, 121, 0.05)';
-      for (let x = -h; x < w + h; x += 36) {
+
+      // Overhead steel I-beam spans
+      ctx.fillStyle = 'rgba(28, 38, 56, 0.55)';
+      ctx.fillRect(0, 24, w, 12);
+      ctx.fillRect(0, h - 36, w, 12);
+      ctx.strokeStyle = 'rgba(58, 78, 115, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(0, 24, w, 12);
+      ctx.strokeRect(0, h - 36, w, 12);
+
+      // Hazard caution stripes on perimeter beam
+      ctx.fillStyle = 'rgba(245, 207, 121, 0.12)';
+      for (let x = -20; x < w + 20; x += 32) {
         ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x + 12, 0);
-        ctx.lineTo(x + 12 - 20, 20);
-        ctx.lineTo(x - 20, 20);
+        ctx.moveTo(x, 24);
+        ctx.lineTo(x + 12, 24);
+        ctx.lineTo(x + 4, 36);
+        ctx.lineTo(x - 8, 36);
         ctx.closePath();
         ctx.fill();
       }
     } else if (theme === 'canyon') {
-      // Amethyst mineral canyon: organic geological strata bands
+      // Amethyst canyon: organic geological strata bands & deep mineral gorge curves
       ctx.strokeStyle = 'rgba(166, 149, 242, 0.08)';
-      ctx.lineWidth = 1.2;
-      for (let y = 30; y < h; y += 54) {
+      ctx.lineWidth = 1.4;
+      for (let y = 30; y < h; y += 48) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.bezierCurveTo(w * 0.3, y - 12, w * 0.7, y + 14, w, y);
+        ctx.bezierCurveTo(w * 0.35, y - 14, w * 0.65, y + 16, w, y);
         ctx.stroke();
       }
+
+      // Glowing crystal geode background motes
+      const pulse = (Math.sin(this.pulsePhase * 1.5) + 1) * 0.5;
+      ctx.fillStyle = `rgba(166, 149, 242, ${0.08 + pulse * 0.06})`;
+      ctx.beginPath();
+      ctx.arc(w * 0.15, h * 0.25, 40, 0, Math.PI * 2);
+      ctx.arc(w * 0.85, h * 0.75, 48, 0, Math.PI * 2);
+      ctx.fill();
     } else if (theme === 'maze') {
-      // Mainframe labyrinth: pulsing cybernetic data bus traces
-      ctx.strokeStyle = 'rgba(111, 175, 255, 0.09)';
+      // Mainframe cyber labyrinth: pulsing data bus traces & micro-circuit buses
+      ctx.strokeStyle = 'rgba(111, 175, 255, 0.08)';
       ctx.lineWidth = 1;
-      const step = 36;
+      const step = 40;
       for (let x = 0; x < w; x += step) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
@@ -448,12 +534,13 @@ export class AegisRenderer {
         ctx.lineTo(w, y);
         ctx.stroke();
       }
-      // Glowing data bus junction circles
-      ctx.fillStyle = 'rgba(102, 218, 213, 0.14)';
-      for (let x = step * 2; x < w; x += step * 4) {
-        for (let y = step * 2; y < h; y += step * 4) {
+
+      // Glowing data bus junction nodes
+      ctx.fillStyle = 'rgba(102, 218, 213, 0.16)';
+      for (let x = step * 2; x < w; x += step * 3) {
+        for (let y = step * 2; y < h; y += step * 3) {
           ctx.beginPath();
-          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.arc(x, y, 2.5, 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -484,32 +571,41 @@ export class AegisRenderer {
     y: number,
     tileType: TileType,
     key: string,
-    theme: SectorTheme
+    theme: SectorTheme,
+    r: number,
+    c: number
   ): void {
     const { ctx, tileSize } = this;
     const pad = 1.5;
     const tw = tileSize - pad * 2;
     const th = tileSize - pad * 2;
 
+    // Stable deterministic pseudo-random seed per grid cell (avoids per-frame jitter)
+    const seed = ((r * 374761393 + c * 668265263) ^ 0x5bf03635) >>> 0;
+    const fRand1 = (seed & 0xff) / 255;
+    const fRand2 = ((seed >> 8) & 0xff) / 255;
+
     ctx.save();
 
-    // Base floor cell styling
+    // 1. Base Walkable Floor Cell Styling
     let fill =
       theme === 'facility'
-        ? '#192236'
+        ? '#182136'
         : theme === 'canyon'
-        ? '#211C33'
+        ? '#201A33'
         : theme === 'maze'
-        ? '#162238'
-        : '#1D2A45';
+        ? '#142036'
+        : '#1C2944';
     let stroke =
       theme === 'facility'
-        ? 'rgba(58, 78, 115, 0.6)'
+        ? 'rgba(58, 78, 115, 0.55)'
         : theme === 'canyon'
-        ? 'rgba(78, 58, 107, 0.6)'
-        : 'rgba(43, 59, 91, 0.6)';
+        ? 'rgba(78, 58, 107, 0.55)'
+        : theme === 'maze'
+        ? 'rgba(48, 70, 108, 0.55)'
+        : 'rgba(43, 59, 91, 0.55)';
 
-    // Search exploration highlights
+    // Search exploration highlights from algorithm visualization
     if (this.highlightedExplored.has(key)) {
       fill = 'rgba(166, 149, 242, 0.28)';
       stroke = 'rgba(166, 149, 242, 0.65)';
@@ -525,23 +621,51 @@ export class AegisRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // Theme-specific decorative floor accents
+    // 2. Theme-Specific Decorative Floor Accents (Subtle, readable, non-obtrusive)
     if (theme === 'facility') {
-      // Corner rivet dots
-      ctx.fillStyle = 'rgba(161, 173, 199, 0.35)';
+      // Occasional cracked laboratory floor tiles & corner rivets
+      if (fRand1 > 0.65) {
+        ctx.strokeStyle = 'rgba(58, 78, 115, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + pad + 3, y + pad + th * 0.3);
+        ctx.lineTo(x + pad + tw * 0.4, y + pad + th * 0.5);
+        ctx.lineTo(x + pad + tw * 0.7, y + pad + th * 0.8);
+        ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(161, 173, 199, 0.25)';
       ctx.fillRect(x + pad + 2, y + pad + 2, 2, 2);
       ctx.fillRect(x + pad + tw - 4, y + pad + 2, 2, 2);
-      ctx.fillRect(x + pad + 2, y + pad + th - 4, 2, 2);
-      ctx.fillRect(x + pad + tw - 4, y + pad + th - 4, 2, 2);
+    } else if (theme === 'canyon') {
+      // Natural alien flagstone moss/crystal speckle
+      if (fRand1 > 0.7) {
+        ctx.fillStyle = fRand2 > 0.5 ? 'rgba(166, 149, 242, 0.35)' : 'rgba(102, 218, 213, 0.3)';
+        ctx.beginPath();
+        ctx.arc(x + pad + tw * fRand2, y + pad + th * fRand1, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     } else if (theme === 'maze') {
-      // Micro circuit connector cross
-      ctx.fillStyle = 'rgba(102, 218, 213, 0.15)';
+      // Fine etched circuit traces
+      ctx.fillStyle = 'rgba(102, 218, 213, 0.18)';
       ctx.fillRect(x + pad + tw / 2 - 1, y + pad + th / 2 - 1, 2, 2);
+      if (fRand1 > 0.75) {
+        ctx.strokeStyle = 'rgba(111, 175, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x + pad + tw / 2, y + pad);
+        ctx.lineTo(x + pad + tw / 2, y + pad + th);
+        ctx.stroke();
+      }
+    } else {
+      // Proving ground corner bevel dots
+      ctx.fillStyle = 'rgba(102, 218, 213, 0.15)';
+      ctx.fillRect(x + pad + 2, y + pad + 2, 2, 2);
+      ctx.fillRect(x + pad + tw - 4, y + pad + th - 4, 2, 2);
     }
 
-    // Specific Tile Overlays
+    // 3. Specific Tile Obstacle Overlays
     if (tileType === 'WALL') {
-      // Reinforced Solid Bulkhead Obstacle
+      // 2.5D Reinforced Solid Wall Bulkhead
       ctx.fillStyle = '#0F1624';
       this.roundRect(x + pad + 1, y + pad + 4, tw - 2, th - 2, 4);
       ctx.fill();
@@ -549,17 +673,21 @@ export class AegisRenderer {
       // Top raised face
       const grad = ctx.createLinearGradient(x, y, x, y + th);
       if (theme === 'canyon') {
-        grad.addColorStop(0, '#423359');
-        grad.addColorStop(0.5, '#2D2340');
-        grad.addColorStop(1, '#1A1426');
+        grad.addColorStop(0, '#4A3763');
+        grad.addColorStop(0.5, '#332747');
+        grad.addColorStop(1, '#1E162B');
       } else if (theme === 'facility') {
-        grad.addColorStop(0, '#364966');
-        grad.addColorStop(0.5, '#25344D');
-        grad.addColorStop(1, '#172233');
+        grad.addColorStop(0, '#3A4E6E');
+        grad.addColorStop(0.5, '#283852');
+        grad.addColorStop(1, '#192436');
+      } else if (theme === 'maze') {
+        grad.addColorStop(0, '#274268');
+        grad.addColorStop(0.5, '#1B2F4D');
+        grad.addColorStop(1, '#111E33');
       } else {
-        grad.addColorStop(0, '#3A507A');
-        grad.addColorStop(0.5, '#2B3C5C');
-        grad.addColorStop(1, '#1E2A42');
+        grad.addColorStop(0, '#3E5582');
+        grad.addColorStop(0.5, '#2D3E61');
+        grad.addColorStop(1, '#1F2C46');
       }
 
       ctx.fillStyle = grad;
@@ -567,45 +695,62 @@ export class AegisRenderer {
       ctx.fill();
 
       // Top edge metallic specular rim
-      ctx.strokeStyle = theme === 'canyon' ? '#6E5594' : '#5A75A8';
+      ctx.strokeStyle =
+        theme === 'canyon' ? '#7A5E9E' : theme === 'facility' ? '#5E7BA8' : '#6FAFFF';
       ctx.lineWidth = 1;
       this.roundRect(x + pad + 1, y + pad + 1, tw - 2, th - 5, 4);
       ctx.stroke();
 
-      // Hazard stripe or crystal vein indicator
+      // Architectural wall features:
       if (theme === 'facility') {
+        // Warning hazard stripe & rebar reinforcement
         ctx.fillStyle = 'rgba(245, 207, 121, 0.85)';
-        ctx.fillRect(x + tw / 2 - 5, y + th / 2 - 4, 10, 3);
+        ctx.fillRect(x + tw / 2 - 6, y + th / 2 - 5, 12, 3);
+        ctx.fillStyle = '#172233';
+        ctx.fillRect(x + tw / 2 - 2, y + th / 2 - 5, 4, 3);
       } else if (theme === 'canyon') {
+        // Embedded glowing amethyst crystal geode
         ctx.fillStyle = '#A695F2';
         ctx.shadowColor = '#A695F2';
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 7;
         ctx.beginPath();
-        ctx.arc(x + tw / 2, y + th / 2 - 2, 3, 0, Math.PI * 2);
+        ctx.arc(x + tw / 2, y + th / 2 - 3, 3.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
+        // Crystal facet specular rim
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+      } else if (theme === 'maze') {
+        // Vertical data conduit energy vein
+        ctx.fillStyle = '#66DAD5';
+        ctx.shadowColor = '#66DAD5';
+        ctx.shadowBlur = 5;
+        ctx.fillRect(x + tw / 2 - 1, y + pad + 3, 2, th - 11);
+        ctx.shadowBlur = 0;
       } else {
-        ctx.fillStyle = 'rgba(255, 155, 131, 0.85)';
-        ctx.fillRect(x + tw / 2 - 5, y + th / 2 - 4, 10, 3);
+        // Proving ground blue status plate
+        ctx.fillStyle = 'rgba(111, 175, 255, 0.85)';
+        ctx.fillRect(x + tw / 2 - 6, y + th / 2 - 5, 12, 3);
       }
     } else if (tileType === 'DEBRIS') {
-      // Interactive Collapsed Debris (Destructible via Emergency Repair Charges)
+      // Interactive Collapsed Debris (Demolishable with Repair Charges)
       ctx.fillStyle = '#111724';
       this.roundRect(x + pad + 1, y + pad + 3, tw - 2, th - 2, 3);
       ctx.fill();
 
       // Fractured rubble chunks
       const rubbleGrad = ctx.createLinearGradient(x, y, x + tw, y + th);
-      rubbleGrad.addColorStop(0, '#5A463B');
-      rubbleGrad.addColorStop(0.5, '#3D2F28');
-      rubbleGrad.addColorStop(1, '#241B16');
+      rubbleGrad.addColorStop(0, '#5C473C');
+      rubbleGrad.addColorStop(0.5, '#40322B');
+      rubbleGrad.addColorStop(1, '#261D19');
       ctx.fillStyle = rubbleGrad;
       this.roundRect(x + pad + 1, y + pad + 1, tw - 2, th - 4, 3);
       ctx.fill();
 
       // Jagged fracture cracks
-      ctx.strokeStyle = 'rgba(245, 207, 121, 0.7)';
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = 'rgba(245, 207, 121, 0.8)';
+      ctx.lineWidth = 1.3;
       ctx.beginPath();
       ctx.moveTo(x + pad + 3, y + pad + th * 0.4);
       ctx.lineTo(x + pad + tw * 0.45, y + pad + th * 0.55);
@@ -618,37 +763,37 @@ export class AegisRenderer {
       ctx.fillRect(x + pad + 5, y + pad + 5, 3, 3);
       ctx.fillRect(x + pad + tw - 8, y + pad + th - 8, 3, 3);
 
-      // Interactive demolition target crosshair indicator (pulse)
+      // Interactive demolition target crosshair indicator (tactile pulse)
       const debrisPulse = (Math.sin(this.pulsePhase * 3.5) + 1) * 0.5;
-      ctx.strokeStyle = `rgba(255, 155, 131, ${0.4 + debrisPulse * 0.5})`;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(255, 155, 131, ${0.45 + debrisPulse * 0.5})`;
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       const cx = x + tw / 2;
       const cy = y + th / 2;
       ctx.arc(cx, cy, Math.max(2, tw * 0.22), 0, Math.PI * 2);
       ctx.stroke();
     } else if (tileType === 'ROUGH_TERRAIN') {
-      // High-friction crystalline field
+      // High-friction crystalline field (3x movement cost)
       ctx.fillStyle =
-        theme === 'canyon' ? 'rgba(166, 149, 242, 0.22)' : 'rgba(245, 207, 121, 0.2)';
+        theme === 'canyon' ? 'rgba(166, 149, 242, 0.24)' : 'rgba(245, 207, 121, 0.22)';
       this.roundRect(x + pad, y + pad, tw, th, 4);
       ctx.fill();
 
       // Glowing crystal shards
       ctx.fillStyle = theme === 'canyon' ? '#A695F2' : '#F5CF79';
-      ctx.shadowColor = theme === 'canyon' ? 'rgba(166, 149, 242, 0.6)' : 'rgba(245, 207, 121, 0.6)';
-      ctx.shadowBlur = 5;
+      ctx.shadowColor = theme === 'canyon' ? 'rgba(166, 149, 242, 0.7)' : 'rgba(245, 207, 121, 0.7)';
+      ctx.shadowBlur = 6;
 
-      // Draw cluster of 3 crystal shard spikes
+      // Cluster of 3 crystal shard spikes
       ctx.beginPath();
-      ctx.moveTo(x + tw * 0.45, y + th * 0.18);
+      ctx.moveTo(x + tw * 0.45, y + th * 0.16);
       ctx.lineTo(x + tw * 0.65, y + th * 0.72);
       ctx.lineTo(x + tw * 0.25, y + th * 0.72);
       ctx.closePath();
       ctx.fill();
 
       ctx.beginPath();
-      ctx.moveTo(x + tw * 0.72, y + th * 0.35);
+      ctx.moveTo(x + tw * 0.72, y + th * 0.32);
       ctx.lineTo(x + tw * 0.88, y + th * 0.75);
       ctx.lineTo(x + tw * 0.58, y + th * 0.75);
       ctx.closePath();
@@ -665,16 +810,16 @@ export class AegisRenderer {
     const { rows, cols } = gridModel;
 
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         if (gridModel.tiles[r][c] === 'WALL' || gridModel.tiles[r][c] === 'DEBRIS') {
-          // Cast shadow onto tile below if open
+          // Cast soft shadow onto tile below if open
           if (r + 1 < rows && gridModel.tiles[r + 1][c] !== 'WALL') {
             const sx = this.offsetX + c * tileSize;
             const sy = this.offsetY + (r + 1) * tileSize;
-            ctx.fillRect(sx + 2, sy + 1, tileSize - 4, 7);
+            ctx.fillRect(sx + 2, sy + 1, tileSize - 4, 8);
           }
         }
       }
@@ -700,7 +845,7 @@ export class AegisRenderer {
     }
     ctx.stroke();
 
-    // Draw red cancellation crosses on invalidated waypoints
+    // Red cancellation crosses on invalidated waypoints
     ctx.strokeStyle = `rgba(255, 90, 70, ${this.invalidatedAlpha * 0.9})`;
     ctx.lineWidth = 1.5;
     ctx.setLineDash([]);
@@ -839,11 +984,11 @@ export class AegisRenderer {
     ctx.restore();
   }
 
-  private renderRescuePod(coord: GridCoord, robot: RobotController): void {
+  private renderRescuePod(coord: GridCoord, robot: RobotController, theme: SectorTheme): void {
     const { ctx, tileSize } = this;
     const cx = this.offsetX + coord.c * tileSize + tileSize / 2;
     const cy = this.offsetY + coord.r * tileSize + tileSize / 2;
-    const isArrived = robot.state === 'ARRIVED';
+    const isArrived = robot.state === 'ARRIVED' || this.rescueActive;
     const pulse = (Math.sin(this.pulsePhase * 2.5) + 1) * 0.5;
 
     ctx.save();
@@ -859,14 +1004,14 @@ export class AegisRenderer {
     ctx.arc(cx, cy, curR, 0, Math.PI * 2);
     ctx.stroke();
 
-    // 2. Pod Base Docking Mount (Hexagonal metal plate)
+    // 2. Pod Base Docking Mount (Heavy octagonal alloy plate)
     const baseR = Math.max(4, tileSize * 0.38);
     ctx.fillStyle = '#0F1626';
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 8;
     ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const angle = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2 + Math.PI / 8;
       const bx = cx + Math.cos(angle) * baseR;
       const by = cy + Math.sin(angle) * baseR;
       if (i === 0) ctx.moveTo(bx, by);
@@ -921,7 +1066,7 @@ export class AegisRenderer {
     ctx.clip();
 
     // Humanoid silhouette in stasis
-    ctx.fillStyle = isArrived ? 'rgba(134, 227, 180, 0.55)' : 'rgba(102, 218, 213, 0.4)';
+    ctx.fillStyle = isArrived ? 'rgba(134, 227, 180, 0.65)' : 'rgba(102, 218, 213, 0.4)';
     // Head
     ctx.beginPath();
     ctx.arc(cx, cy - podH * 0.16, Math.max(0.1, podW * 0.16), 0, Math.PI * 2);
@@ -939,7 +1084,7 @@ export class AegisRenderer {
     const ecgY = cy + podH * 0.05;
     const ecgColor = isArrived ? '#86E3B4' : '#66DAD5';
     ctx.strokeStyle = ecgColor;
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1.2;
     ctx.shadowColor = ecgColor;
     ctx.shadowBlur = 4;
     ctx.beginPath();
@@ -989,17 +1134,17 @@ export class AegisRenderer {
       const ry = this.offsetY + robot.visualY * tileSize + tileSize / 2;
 
       ctx.save();
-      ctx.strokeStyle = 'rgba(134, 227, 180, 0.55)';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(134, 227, 180, 0.6)';
+      ctx.lineWidth = 3.5;
       ctx.beginPath();
       ctx.moveTo(rx, ry);
       ctx.lineTo(cx, cy);
       ctx.stroke();
 
       ctx.strokeStyle = '#86E3B4';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 4]);
-      ctx.lineDashOffset = -this.pulsePhase * 16;
+      ctx.lineDashOffset = -this.pulsePhase * 18;
       ctx.beginPath();
       ctx.moveTo(rx, ry);
       ctx.lineTo(cx, cy);
@@ -1024,8 +1169,8 @@ export class AegisRenderer {
       ctx.restore();
 
       // Pulsing docking energy ring on deck plate
-      ctx.strokeStyle = `rgba(134, 227, 180, ${Math.max(0, 0.35 + Math.sin(this.pulsePhase * 4) * 0.25)})`;
-      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = `rgba(134, 227, 180, ${Math.max(0, 0.4 + Math.sin(this.pulsePhase * 4) * 0.25)})`;
+      ctx.lineWidth = 2.0;
       ctx.beginPath();
       ctx.arc(cx, cy, baseR + 6 + Math.sin(this.pulsePhase * 3) * 3, 0, Math.PI * 2);
       ctx.stroke();
@@ -1066,7 +1211,7 @@ export class AegisRenderer {
    * Hexagonal armored silhouette, cycling tread tracks, sweeping scanner eye,
    * dual volumetric headlights, and ion thruster particle exhaust.
    */
-  private renderRobot(robot: RobotController): void {
+  private renderRobot(robot: RobotController, theme: SectorTheme): void {
     const { ctx, tileSize } = this;
     const rx = this.offsetX + robot.visualX * tileSize + tileSize / 2;
     const ry = this.offsetY + robot.visualY * tileSize + tileSize / 2;
@@ -1153,7 +1298,7 @@ export class AegisRenderer {
 
     // Tread teeth cycling animation
     ctx.fillStyle = '#2B3B5B';
-    const treadShift = (this.pulsePhase * 8) % 5;
+    const treadShift = (this.treadTravelDist) % 5;
     for (let ti = 0; ti < 5; ti++) {
       const toothX = -radius * 0.8 + ti * (radius * 0.38) + (robot.state === 'MOVING' ? treadShift * 0.6 : 0);
       if (toothX > -radius * 0.85 && toothX < radius * 0.75) {
@@ -1207,7 +1352,12 @@ export class AegisRenderer {
     ctx.fill();
 
     // Sweeping Scanner Eye Beam
-    const eyeColor = robot.state === 'BLOCKED' ? '#FF9B83' : '#66DAD5';
+    const eyeColor =
+      robot.state === 'BLOCKED'
+        ? '#FF9B83'
+        : robot.state === 'ARRIVED' || this.rescueActive
+        ? '#86E3B4'
+        : '#66DAD5';
     const sweepY = Math.sin(this.pulsePhase * 4) * (radius * 0.22);
 
     ctx.fillStyle = eyeColor;
@@ -1220,14 +1370,19 @@ export class AegisRenderer {
 
     // 6. Central Concentric Energy Core
     const corePulse = (Math.sin(this.pulsePhase * 3.0) + 1) * 0.5;
-    ctx.strokeStyle = 'rgba(102, 218, 213, 0.45)';
+    ctx.strokeStyle =
+      robot.state === 'ARRIVED' || this.rescueActive
+        ? 'rgba(134, 227, 180, 0.45)'
+        : 'rgba(102, 218, 213, 0.45)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(-radius * 0.2, 0, Math.max(0.1, 5 + corePulse * 1.5), 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.fillStyle = '#66DAD5';
-    ctx.shadowColor = '#66DAD5';
+    ctx.fillStyle =
+      robot.state === 'ARRIVED' || this.rescueActive ? '#86E3B4' : '#66DAD5';
+    ctx.shadowColor =
+      robot.state === 'ARRIVED' || this.rescueActive ? '#86E3B4' : '#66DAD5';
     ctx.shadowBlur = 7;
     ctx.beginPath();
     ctx.arc(-radius * 0.2, 0, Math.max(0.1, 3.0 + corePulse * 1.2), 0, Math.PI * 2);

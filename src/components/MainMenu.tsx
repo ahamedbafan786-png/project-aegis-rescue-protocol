@@ -25,7 +25,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Decorative hero animation of Aegis-1 in patrol loop
+  // Decorative hero animation of Aegis-1 in tactical patrol loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -34,82 +34,174 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 
     let animId: number;
     let angle = 0;
+    let time = 0;
     const dpr = window.devicePixelRatio || 1;
     canvas.width = 320 * dpr;
     canvas.height = 320 * dpr;
     ctx.scale(dpr, dpr);
 
     const renderHero = () => {
-      angle += 0.015;
+      angle += 0.012;
+      time += 0.02;
       ctx.clearRect(0, 0, 320, 320);
 
       const cx = 160;
       const cy = 160;
 
-      // Concentric tactical rings
-      ctx.strokeStyle = 'rgba(43, 59, 91, 0.4)';
+      // 1. Concentric tactical radar rings
+      ctx.strokeStyle = 'rgba(43, 59, 91, 0.45)';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(cx, cy, 120, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 125, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(102, 218, 213, 0.25)';
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.22)';
       ctx.beginPath();
-      ctx.arc(cx, cy, 90, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 95, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Rotating radar sweep
+      // Rotating holographic radar sweep
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(angle);
 
-      const sweepGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 120);
+      const sweepGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 125);
       sweepGrad.addColorStop(0, 'rgba(102, 218, 213, 0.35)');
+      sweepGrad.addColorStop(0.7, 'rgba(102, 218, 213, 0.08)');
       sweepGrad.addColorStop(1, 'rgba(102, 218, 213, 0)');
       ctx.fillStyle = sweepGrad;
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, 120, -Math.PI * 0.25, Math.PI * 0.25);
+      ctx.arc(0, 0, 125, -Math.PI * 0.22, Math.PI * 0.22);
       ctx.closePath();
       ctx.fill();
 
-      // Robot chassis ("Aegis-1")
-      const radius = 32;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 16;
-      ctx.shadowOffsetY = 6;
+      // Calibration tick marks on outer ring
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.35)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 12; i++) {
+        const tickAngle = (i / 12) * Math.PI * 2;
+        const tx1 = Math.cos(tickAngle) * 120;
+        const ty1 = Math.sin(tickAngle) * 120;
+        const tx2 = Math.cos(tickAngle) * 128;
+        const ty2 = Math.sin(tickAngle) * 128;
+        ctx.beginPath();
+        ctx.moveTo(tx1, ty1);
+        ctx.lineTo(tx2, ty2);
+        ctx.stroke();
+      }
 
-      const hullGrad = ctx.createLinearGradient(-radius, -radius, radius, radius);
-      hullGrad.addColorStop(0, '#465A84');
-      hullGrad.addColorStop(0.5, '#2D3D5E');
-      hullGrad.addColorStop(1, '#1E2B45');
-      ctx.fillStyle = hullGrad;
+      // 2. Robot chassis ("Aegis-1") in hero presentation
+      const radius = 34;
+
+      // Volumetric searchlight cones
+      const lightLength = 70;
+      const lightGradLeft = ctx.createRadialGradient(
+        radius * 0.6, -radius * 0.7, 2,
+        radius * 1.5, -radius * 0.7, lightLength
+      );
+      lightGradLeft.addColorStop(0, 'rgba(102, 218, 213, 0.45)');
+      lightGradLeft.addColorStop(0.6, 'rgba(102, 218, 213, 0.12)');
+      lightGradLeft.addColorStop(1, 'rgba(102, 218, 213, 0)');
+      ctx.fillStyle = lightGradLeft;
       ctx.beginPath();
-      ctx.roundRect(-radius, -radius * 0.8, radius * 2, radius * 1.6, 12);
+      ctx.moveTo(radius * 0.6, -radius * 0.7);
+      ctx.arc(radius * 0.6, -radius * 0.7, lightLength, -Math.PI * 0.16, Math.PI * 0.12);
+      ctx.closePath();
       ctx.fill();
 
+      const lightGradRight = ctx.createRadialGradient(
+        radius * 0.6, radius * 0.7, 2,
+        radius * 1.5, radius * 0.7, lightLength
+      );
+      lightGradRight.addColorStop(0, 'rgba(102, 218, 213, 0.45)');
+      lightGradRight.addColorStop(0.6, 'rgba(102, 218, 213, 0.12)');
+      lightGradRight.addColorStop(1, 'rgba(102, 218, 213, 0)');
+      ctx.fillStyle = lightGradRight;
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.6, radius * 0.7);
+      ctx.arc(radius * 0.6, radius * 0.7, lightLength, -Math.PI * 0.12, Math.PI * 0.16);
+      ctx.closePath();
+      ctx.fill();
+
+      // Articulated Side Tread Pods
+      ctx.fillStyle = '#141D2E';
+      ctx.beginPath();
+      ctx.roundRect(-radius * 0.95, -radius * 0.95, radius * 1.9, radius * 0.36, 4);
+      ctx.roundRect(-radius * 0.95, radius * 0.6, radius * 1.9, radius * 0.36, 4);
+      ctx.fill();
+
+      // Animated tread teeth
+      ctx.fillStyle = '#2B3B5B';
+      const treadShift = (time * 12) % 6;
+      for (let ti = 0; ti < 5; ti++) {
+        const toothX = -radius * 0.8 + ti * (radius * 0.38) + treadShift * 0.4;
+        if (toothX > -radius * 0.85 && toothX < radius * 0.75) {
+          ctx.fillRect(toothX, -radius * 0.93, 2.5, radius * 0.32);
+          ctx.fillRect(toothX, radius * 0.62, 2.5, radius * 0.32);
+        }
+      }
+
+      // Rolling bogie wheels
+      ctx.fillStyle = '#1E2C48';
+      for (let bi = 0; bi < 3; bi++) {
+        const bx = -radius * 0.55 + bi * (radius * 0.55);
+        ctx.beginPath();
+        ctx.arc(bx, -radius * 0.77, 2.8, 0, Math.PI * 2);
+        ctx.arc(bx, radius * 0.78, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Armored Chassis Hull
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+      ctx.shadowBlur = 18;
+      ctx.shadowOffsetY = 8;
+
+      const hullGrad = ctx.createLinearGradient(-radius, -radius, radius, radius);
+      hullGrad.addColorStop(0, '#526C9E');
+      hullGrad.addColorStop(0.45, '#31446B');
+      hullGrad.addColorStop(1, '#1D2A42');
+      ctx.fillStyle = hullGrad;
+      ctx.beginPath();
+      ctx.roundRect(-radius, -radius * 0.72, radius * 2, radius * 1.44, radius * 0.42);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
       ctx.strokeStyle = '#6FAFFF';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.8;
       ctx.stroke();
 
       // Front visor
-      ctx.fillStyle = '#101B2E';
+      ctx.fillStyle = '#0B1320';
       ctx.beginPath();
-      ctx.roundRect(radius * 0.1, -radius * 0.5, radius * 0.8, radius * 1.0, 4);
+      ctx.roundRect(radius * 0.08, -radius * 0.45, radius * 0.8, radius * 0.9, 4);
       ctx.fill();
 
-      // Sensor eye
+      // Sweeping sensor eye
+      const sweepY = Math.sin(time * 3) * (radius * 0.22);
       ctx.fillStyle = '#66DAD5';
       ctx.shadowColor = '#66DAD5';
       ctx.shadowBlur = 10;
       ctx.beginPath();
-      ctx.arc(radius * 0.55, 0, 5, 0, Math.PI * 2);
+      ctx.arc(radius * 0.55, sweepY, 3.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
 
-      // Center power core
+      // Central concentric energy core
+      const corePulse = (Math.sin(time * 4) + 1) * 0.5;
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.5)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(-radius * 0.2, 0, 5 + Math.sin(angle * 4) * 1.5, 0, Math.PI * 2);
+      ctx.arc(-radius * 0.2, 0, 5 + corePulse * 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#66DAD5';
+      ctx.shadowColor = '#66DAD5';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(-radius * 0.2, 0, 3 + corePulse * 1.5, 0, Math.PI * 2);
       ctx.fill();
+      ctx.shadowBlur = 0;
 
       ctx.restore();
 

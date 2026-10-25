@@ -54,6 +54,15 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
             const debrisSet = new Set(mission.initialDebris?.map((d) => `${d.r},${d.c}`) || []);
             const roughSet = new Set(mission.initialRoughTerrain?.map((t) => `${t.r},${t.c}`) || []);
 
+            const themeAccents: Record<string, { border: string; badge: string; text: string; bg: string }> = {
+              training: { border: 'border-[#66DAD5]/30 hover:border-[#66DAD5] hover:shadow-[#66DAD5]/15', badge: 'bg-[#66DAD5]/15 text-[#66DAD5] border-[#66DAD5]/40', text: 'PROVING GROUNDS', bg: 'bg-[#18233C]' },
+              facility: { border: 'border-[#F5CF79]/35 hover:border-[#F5CF79] hover:shadow-[#F5CF79]/15', badge: 'bg-[#F5CF79]/15 text-[#F5CF79] border-[#F5CF79]/40', text: 'RESEARCH LAB', bg: 'bg-[#182030]' },
+              canyon: { border: 'border-[#A695F2]/35 hover:border-[#A695F2] hover:shadow-[#A695F2]/15', badge: 'bg-[#A695F2]/15 text-[#A695F2] border-[#A695F2]/40', text: 'AMETHYST CANYON', bg: 'bg-[#1C1630]' },
+              maze: { border: 'border-[#6FAFFF]/35 hover:border-[#6FAFFF] hover:shadow-[#6FAFFF]/15', badge: 'bg-[#6FAFFF]/15 text-[#6FAFFF] border-[#6FAFFF]/40', text: 'MAINFRAME CORE', bg: 'bg-[#121B2D]' },
+              presentation: { border: 'border-[#FF9B83]/40 hover:border-[#FF9B83] hover:shadow-[#FF9B83]/20', badge: 'bg-[#FF9B83]/15 text-[#FF9B83] border-[#FF9B83]/40', text: 'COLLEGE DEMO', bg: 'bg-[#222338]' },
+            };
+            const envStyle = themeAccents[mission.environmentTheme] || themeAccents.training;
+
             return (
               <div
                 key={mission.id}
@@ -62,11 +71,7 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                   sound.playClick();
                   onSelectMission(mission);
                 }}
-                className={`group relative rounded-2xl p-5 transition-all duration-200 cursor-pointer flex flex-col justify-between border ${
-                  isPresentation
-                    ? 'bg-gradient-to-b from-[#2B3B5B]/85 to-[#1F2C47] border-[#FF9B83]/50 hover:border-[#FF9B83] shadow-lg shadow-[#FF9B83]/10 hover:shadow-[#FF9B83]/20'
-                    : 'bg-[#1F2C47]/90 hover:bg-[#253554] border-[#2B3B5B] hover:border-[#66DAD5]/60 hover:shadow-xl hover:shadow-[#66DAD5]/10'
-                } hover:-translate-y-1`}
+                className={`group relative rounded-2xl p-5 transition-all duration-200 cursor-pointer flex flex-col justify-between border bg-[#1F2C47]/90 hover:bg-[#253554] shadow-lg hover:shadow-xl hover:-translate-y-1 ${envStyle.border}`}
               >
                 <div>
                   {/* Top Bar / Badges */}
@@ -74,13 +79,18 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                     <span className="text-[11px] font-mono font-bold text-[#A1ADC7] tracking-wider uppercase">
                       {mission.badgeLabel}
                     </span>
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
-                        difficultyColors[mission.difficulty]
-                      }`}
-                    >
-                      {mission.difficulty}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${envStyle.badge}`}>
+                        {envStyle.text}
+                      </span>
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                          difficultyColors[mission.difficulty]
+                        }`}
+                      >
+                        {mission.difficulty}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Title & Subtitle */}
@@ -91,10 +101,10 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                     {mission.subtitle}
                   </h4>
 
-                  {/* Procedural Mini-Map Preview (Eliminates Generic AI Card Look) */}
-                  <div className="my-3.5 p-2 bg-[#17233D] rounded-xl border border-[#2B3B5B] flex items-center justify-center">
+                  {/* Procedural Mini-Map Preview (Reflects environment personality) */}
+                  <div className={`my-3.5 p-2 rounded-xl border border-[#2B3B5B] flex items-center justify-center ${envStyle.bg}`}>
                     <div
-                      className="grid gap-[2px] bg-[#121A2B] p-1.5 rounded-lg border border-[#23324E]"
+                      className="grid gap-[2px] bg-[#121A2B]/80 p-1.5 rounded-lg border border-[#23324E]"
                       style={{
                         gridTemplateColumns: `repeat(${Math.min(22, mission.cols)}, minmax(0, 1fr))`,
                       }}
@@ -118,9 +128,15 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                                   : isDebris
                                   ? 'bg-[#FF9B83] shadow-sm shadow-[#FF9B83]/50'
                                   : isWall
-                                  ? 'bg-[#3A507A]'
+                                  ? mission.environmentTheme === 'canyon'
+                                    ? 'bg-[#5B4378]'
+                                    : mission.environmentTheme === 'facility'
+                                    ? 'bg-[#485B7A]'
+                                    : 'bg-[#3A507A]'
                                   : isRough
-                                  ? 'bg-[#F5CF79]/50'
+                                  ? mission.environmentTheme === 'canyon'
+                                    ? 'bg-[#A695F2]/70'
+                                    : 'bg-[#F5CF79]/50'
                                   : 'bg-[#1C273D]'
                               }`}
                             />
