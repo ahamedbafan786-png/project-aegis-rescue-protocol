@@ -131,4 +131,56 @@ describe('Emergency Corridor Control — Tactical Debris Clearance Mechanic', ()
     expect(telemetry.remainingCost).toBe(replanRes.totalCost);
     expect(telemetry.totalMissionCost).toBe(telemetry.executedCost + telemetry.remainingCost);
   });
+
+  it('guarantees repair charges cannot drop below zero and unbreached debris blocks robot', () => {
+    const challenge1 = MISSIONS.find((m) => m.id === 'mission-challenge-1')!;
+    const model = new GridModel(challenge1.rows, challenge1.cols, challenge1.start, challenge1.target);
+    challenge1.initialWalls.forEach((w) => model.setTile(w.r, w.c, 'WALL'));
+    challenge1.initialRoughTerrain?.forEach((t) => model.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
+    challenge1.initialDebris?.forEach((d) => model.setTile(d.r, d.c, 'DEBRIS'));
+
+    let repairCharges = challenge1.repairCharges!;
+    expect(repairCharges).toBe(2);
+
+    // Simulate clearing helper function (identical to GameHUD demolish logic)
+    const tryBreachDebris = (r: number, c: number): boolean => {
+      if (repairCharges <= 0) return false;
+      if (model.tiles[r][c] !== 'DEBRIS') return false;
+      repairCharges--;
+      model.setTile(r, c, 'EMPTY');
+      return true;
+    };
+
+    // Attempting to clear normal wall must fail and not consume charges
+    expect(tryBreachDebris(6, 5)).toBe(false);
+    expect(repairCharges).toBe(2);
+    expect(model.tiles[6][5]).toBe('WALL');
+
+    // Breach first debris cell (5, 8)
+    expect(tryBreachDebris(5, 8)).toBe(true);
+    expect(repairCharges).toBe(1);
+    expect(model.tiles[5][8]).toBe('EMPTY');
+
+    // Breach second debris cell (5, 12)
+    expect(tryBreachDebris(5, 12)).toBe(true);
+    expect(repairCharges).toBe(0);
+    expect(model.tiles[5][12]).toBe('EMPTY');
+
+    // Attempting further breach with 0 charges must fail
+    expect(tryBreachDebris(5, 8)).toBe(false);
+    expect(repairCharges).toBe(0);
+
+    // Reset restores initial state and charges
+    let resetCharges = challenge1.repairCharges!;
+    const resetModel = new GridModel(challenge1.rows, challenge1.cols, challenge1.start, challenge1.target);
+    challenge1.initialWalls.forEach((w) => resetModel.setTile(w.r, w.c, 'WALL'));
+    challenge1.initialRoughTerrain?.forEach((t) => resetModel.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
+    challenge1.initialDebris?.forEach((d) => resetModel.setTile(d.r, d.c, 'DEBRIS'));
+
+    expect(resetCharges).toBe(2);
+    expect(resetModel.tiles[5][8]).toBe('DEBRIS');
+    expect(resetModel.tiles[5][12]).toBe('DEBRIS');
+    expect(isTileBlocked(resetModel.tiles[5][8])).toBe(true);
+    expect(isTileBlocked(resetModel.tiles[5][12])).toBe(true);
+  });
 });

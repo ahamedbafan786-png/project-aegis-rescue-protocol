@@ -48,6 +48,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   const [activePath, setActivePath] = useState<GridCoord[]>([]);
   // Presenter script collapsed by default per specification
   const [showPresenterNotes, setShowPresenterNotes] = useState<boolean>(false);
+  // Presenter Auto-Hold at Demo Window so trigger is never missed during live presentations
+  const [holdAtWindow, setHoldAtWindow] = useState<boolean>(true);
+  const hasAutoHeldRef = useRef<boolean>(false);
 
   const [telemetry, setTelemetry] = useState({
     r: mission.start.r,
@@ -143,6 +146,22 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
       const robot = robotRef.current;
       robot.update(deltaSec, 1.25); // Comfortable presentation speed
 
+      // Presenter Auto-Hold: pauses inside the demo window so the presenter never misses the blockage
+      if (
+        holdAtWindow &&
+        robot.state === 'MOVING' &&
+        robot.logicalPos.r === 5 &&
+        robot.logicalPos.c >= 4 &&
+        robot.logicalPos.c <= 6 &&
+        robot.replansCount === 0 &&
+        !hasAutoHeldRef.current
+      ) {
+        hasAutoHeldRef.current = true;
+        robot.pause();
+        setRobotState('IDLE');
+        setStatusMessage('DEMO WINDOW REACHED — TRIGGER COLLAPSE TO REPLAN');
+      }
+
       if (robot.state === 'ARRIVED' && robotState !== 'ARRIVED') {
         setRobotState('ARRIVED');
         setStatusMessage('MISSION ACCOMPLISHED');
@@ -214,6 +233,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
 
   const handleReset = () => {
     sound.playClick();
+    hasAutoHeldRef.current = false;
     const next = new GridModel(mission.rows, mission.cols, mission.start, mission.target);
     mission.initialWalls.forEach((w) => next.setTile(w.r, w.c, 'WALL'));
     gridModelRef.current = next;
@@ -287,20 +307,26 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     rendererRef.current?.triggerBlockageVisual(blockCoord, activePath, robot.logicalPos);
 
     robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
+
+    // If robot was paused at the demo window, resume transit along the replanned detour
+    if (robot.state === 'IDLE') {
+      robot.startMoving();
+      setRobotState('MOVING');
+    }
   };
 
-  // Demo window detection per Phase 2 requirements
+  // Demo window detection per Phase 2 requirements (expanded for presenter comfort)
   const isInDemoWindow =
-    robotState === 'MOVING' &&
+    (robotState === 'MOVING' || robotState === 'IDLE') &&
     telemetry.replans === 0 &&
     telemetry.r === 5 &&
-    telemetry.c >= 3 &&
-    telemetry.c <= 7;
+    telemetry.c >= 2 &&
+    telemetry.c <= 8;
 
   const isPastDemoWindow =
     telemetry.replans === 0 &&
-    ((telemetry.r === 5 && telemetry.c > 7) || telemetry.r !== 5) &&
-    robotState === 'MOVING';
+    ((telemetry.r === 5 && telemetry.c > 8) || telemetry.r !== 5) &&
+    (robotState === 'MOVING' || robotState === 'IDLE');
 
   const isDetourActive = telemetry.replans > 0;
 
@@ -425,8 +451,31 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
           </div>
         </div>
 
-        {/* Dynamic Status Pill & Script Toggle */}
+        {/* Dynamic Status Pill, Auto-Hold Toggle & Script Toggle */}
         <div className="flex items-center gap-2 sm:gap-3">
+          <button
+            onClick={() => setHoldAtWindow((p) => !p)}
+            data-testid="toggle-auto-hold"
+            title={
+              holdAtWindow
+                ? 'Presenter Auto-Hold Active: Automatically pauses Aegis-1 at demo window to guarantee live trigger timing'
+                : 'Presenter Auto-Hold Off: Aegis-1 moves continuously through corridor'
+            }
+            className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
+              holdAtWindow
+                ? 'bg-[#FF9B83]/20 border-[#FF9B83] text-[#FF9B83]'
+                : 'bg-[#151F36] border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                holdAtWindow ? 'bg-[#FF9B83] animate-pulse' : 'bg-[#A1ADC7]'
+              }`}
+            />
+            <span className="hidden sm:inline">Auto-Hold</span>{' '}
+            <span className="font-bold">{holdAtWindow ? 'ON' : 'OFF'}</span>
+          </button>
+
           <button
             onClick={() => setShowPresenterNotes((v) => !v)}
             className={`px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all ${
