@@ -162,7 +162,7 @@ async function runAcceptanceSuite() {
     // SCENARIO 2: NORMAL MOVING TRIGGER COLLAPSE (AUTO-HOLD OFF)
     // -------------------------------------------------------------------------
     console.log('\n[SCENARIO 2] Verifying Moving Trigger Collapse (Auto-Hold OFF)...');
-    await clickButtonWithText(page, 'Reset');
+    await page.click('[data-testid="presentation-reset-btn"]');
     await new Promise((r) => setTimeout(r, 400));
 
     // Turn Auto-Hold OFF
@@ -213,7 +213,7 @@ async function runAcceptanceSuite() {
     // SCENARIO 2B: TRIGGER COLLAPSE BEFORE DEPLOY (TEST C)
     // -------------------------------------------------------------------------
     console.log('\n[SCENARIO 2B] Verifying Trigger Collapse BEFORE Deploy (Test C)...');
-    await clickButtonWithText(page, 'Reset');
+    await page.click('[data-testid="presentation-reset-btn"]');
     await new Promise((r) => setTimeout(r, 400));
 
     // Verify initial pre-deploy status: EXHIBIT READY — PRESS DEPLOY
@@ -377,7 +377,7 @@ async function runAcceptanceSuite() {
     // SCENARIO 7 & 8: RESET & REPLAY RESTORATION
     // -------------------------------------------------------------------------
     console.log('\n[SCENARIO 7 & 8] Verifying Reset & Replay Restoration...');
-    await clickButtonWithText(page, 'Reset');
+    await page.click('[data-testid="hud-reset-btn"]');
     await new Promise((r) => setTimeout(r, 500));
 
     const resetText = await page.evaluate(() => document.body.innerText);
