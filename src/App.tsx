@@ -8,6 +8,7 @@ import { MissionSelect } from './components/MissionSelect';
 import { Navbar, ScreenMode } from './components/Navbar';
 import { PresentationMode } from './components/PresentationMode';
 import { sound } from './game/soundEngine';
+import { calculateStarRating } from './game/scoring';
 import { MissionDefinition, MISSIONS } from './missions/missionData';
 
 export function App() {
@@ -81,10 +82,13 @@ export function App() {
     setLatestResults(stats);
     setResultsModalOpen(true);
 
-    // Calculate star rating
-    let stars = 1;
-    if (stats.steps <= currentMission.targetStepsForStar3 * 1.3) stars = 2;
-    if (stats.steps <= currentMission.targetStepsForStar3 && stats.replans <= 2) stars = 3;
+    // Calculate star rating using verified scoring engine
+    const scoring = calculateStarRating(
+      stats.steps,
+      stats.replans,
+      currentMission.targetStepsForStar3
+    );
+    const stars = scoring.stars;
 
     setCompletedMissions((prev) => {
       const existing = prev[currentMission.id];

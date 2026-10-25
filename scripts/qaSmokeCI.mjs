@@ -7,6 +7,14 @@
  */
 
 import puppeteer from 'puppeteer';
+import {
+  assertExactInt,
+  assertFloatClose,
+  assertNonOverlap,
+  assertInViewportBounds,
+  assertDimensionsPositive,
+  runNegativeAssertionSelfTests,
+} from './qaAssertionUtils.mjs';
 
 const targetUrl = process.argv[2] || process.env.TEST_URL || 'http://127.0.0.1:4173/';
 
@@ -133,54 +141,101 @@ async function runSmokeTest() {
     });
 
     console.log(`  -> Scoped Telemetry: steps=${presTele.steps}, replans=${presTele.replans}, cost=${presTele.cost}`);
-    if (presTele.steps !== 20 || presTele.replans !== 1 || Math.abs(presTele.cost - 20.0) > 0.01) {
-      throw new Error(`Telemetry assertion failure: expected steps=20, replans=1, cost=20.0; got steps=${presTele.steps}, replans=${presTele.replans}, cost=${presTele.cost}`);
-    }
+    assertExactInt(presTele.steps, 20, 'Presentation Detour Steps');
+    assertExactInt(presTele.replans, 1, 'Presentation Detour Replans');
+    assertFloatClose(presTele.cost, 20.0, 0.01, 'Presentation Detour Cost');
 
     // 3. Challenge Mode Mobile HUD Bounding-Box Layout & Non-Overlap
-    console.log('\n[CHECK 3] Verifying Challenge Mobile HUD Bounding-Box Layout (390x844)...');
-    await page.setViewport({ width: 390, height: 844 });
+    console.log('\n[CHECK 3] Verifying Challenge Mobile HUD Bounding-Box Layout (390x844 and 320x844)...');
+    const smokeViewports = [
+      { width: 390, height: 844 },
+      { width: 320, height: 844 },
+    ];
+
+    await page.setViewport({ width: smokeViewports[0].width, height: smokeViewports[0].height });
     await page.click('[data-nav-item="missions"]');
     await page.waitForSelector('[data-mission-card="mission-challenge-1"]', { timeout: 6000 });
     await page.click('[data-mission-card="mission-challenge-1"]');
     await page.waitForSelector('[data-testid="mobile-repair-counter"]', { timeout: 6000 });
 
-    const hudCheck = await page.evaluate(() => {
-      const counterEl = document.querySelector('[data-testid="mobile-repair-counter"]');
-      if (!counterEl) return { ok: false, reason: 'counter missing' };
-      const counterRect = counterEl.getBoundingClientRect();
+    for (const vp of smokeViewports) {
+      await page.setViewport({ width: vp.width, height: vp.height });
+      await new Promise((r) => setTimeout(r, 200));
 
-      const allButtons = Array.from(document.querySelectorAll('button'));
-      const toolsBtn = document.querySelector('[aria-label="Open Tools Drawer"]') || allButtons.find((b) => b.innerText.includes('Tools'));
-      const telBtn = document.querySelector('[aria-label="Open Telemetry Drawer"]') || allButtons.find((b) => b.innerText.includes('Telemetry'));
+      const hudData = await page.evaluate(() => {
+        const counterEl = document.querySelector('[data-testid="mobile-repair-counter"]');
+        const toolsBtn = document.querySelector('[aria-label="Open Tools Drawer"]');
+        const telBtn = document.querySelector('[aria-label="Open Telemetry Drawer"]');
 
-      if (!toolsBtn || !telBtn) return { ok: false, reason: 'dock buttons missing' };
+        if (!counterEl || !toolsBtn || !telBtn) {
+          return { found: false };
+        }
 
-      const toolsRect = toolsBtn.getBoundingClientRect();
-      const telRect = telBtn.getBoundingClientRect();
+        const counterRect = counterEl.getBoundingClientRect();
+        const toolsRect = toolsBtn.getBoundingClientRect();
+        const telRect = telBtn.getBoundingClientRect();
+        const style = window.getComputedStyle(counterEl);
+        const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+        const text = (counterEl.innerText || counterEl.textContent || '').trim();
 
-      const intersects = (r1, r2) => !(
-        r1.right <= r2.left ||
-        r1.left >= r2.right ||
-        r1.bottom <= r2.top ||
-        r1.top >= r2.bottom
-      );
+        return {
+          found: true,
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
+          isVisible,
+          text,
+          counterRect: {
+            left: counterRect.left,
+            right: counterRect.right,
+            top: counterRect.top,
+            bottom: counterRect.bottom,
+            width: counterRect.width,
+            height: counterRect.height,
+          },
+          toolsRect: {
+            left: toolsRect.left,
+            right: toolsRect.right,
+            top: toolsRect.top,
+            bottom: toolsRect.bottom,
+            width: toolsRect.width,
+            height: toolsRect.height,
+          },
+          telRect: {
+            left: telRect.left,
+            right: telRect.right,
+            top: telRect.top,
+            bottom: telRect.bottom,
+            width: telRect.width,
+            height: telRect.height,
+          },
+        };
+      });
 
-      const style = window.getComputedStyle(counterEl);
-      const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-      const hasSize = counterRect.width > 0 && counterRect.height > 0;
-      const overlapsTools = intersects(counterRect, toolsRect);
-      const overlapsTel = intersects(counterRect, telRect);
-      const isClipped = counterRect.left < 0 || counterRect.right > 390;
-      const has2Charges = (counterEl.innerText || counterEl.textContent || '').includes('2/2');
+      if (!hudData.found) {
+        throw new Error(`Mobile HUD elements missing at viewport ${vp.width}x${vp.height}`);
+      }
 
-      const ok = isVisible && hasSize && !overlapsTools && !overlapsTel && !isClipped && has2Charges;
-      return { ok, isVisible, hasSize, overlapsTools, overlapsTel, isClipped, has2Charges };
-    });
+      assertExactInt(hudData.innerWidth, vp.width, `Viewport Width (${vp.width}px)`);
+      assertExactInt(hudData.innerHeight, vp.height, `Viewport Height (${vp.height}px)`);
+      if (!hudData.isVisible) {
+        throw new Error(`Mobile repair counter is not visible at ${vp.width}x${vp.height}`);
+      }
+      if (!hudData.text.includes('2/2')) {
+        throw new Error(`Mobile repair counter text does not contain "2/2" (got: "${hudData.text}")`);
+      }
 
-    console.log('  -> HUD Check Result:', hudCheck);
-    if (!hudCheck.ok) {
-      throw new Error(`Mobile HUD failed verification: ${JSON.stringify(hudCheck)}`);
+      assertDimensionsPositive(hudData.counterRect, `Mobile Repair Counter (${vp.width}px)`);
+      assertDimensionsPositive(hudData.toolsRect, `Tools Drawer Button (${vp.width}px)`);
+      assertDimensionsPositive(hudData.telRect, `Telemetry Drawer Button (${vp.width}px)`);
+
+      assertNonOverlap(hudData.counterRect, hudData.toolsRect, 'Repair Counter', 'Tools Button');
+      assertNonOverlap(hudData.counterRect, hudData.telRect, 'Repair Counter', 'Telemetry Button');
+
+      assertInViewportBounds(hudData.counterRect, vp.width, vp.height, 'Repair Counter');
+      assertInViewportBounds(hudData.toolsRect, vp.width, vp.height, 'Tools Button');
+      assertInViewportBounds(hudData.telRect, vp.width, vp.height, 'Telemetry Button');
+
+      console.log(`  -> Viewport ${vp.width}x${vp.height}: Non-overlap verified, within bounds, text="${hudData.text}"`);
     }
 
     // 4. Algorithm Arena Scoped Metric Verification
@@ -211,15 +266,9 @@ async function runSmokeTest() {
     });
 
     console.log(`  -> Arena Scoped Metrics: BFS(cost=${arenaMetrics.bfs.cost}), A*(cost=${arenaMetrics.astar.cost}), Dijkstra(cost=${arenaMetrics.dijkstra.cost})`);
-    if (Math.abs(arenaMetrics.bfs.cost - 30.0) > 0.01) {
-      throw new Error(`Arena BFS cost mismatch: expected 30.0, got ${arenaMetrics.bfs.cost}`);
-    }
-    if (Math.abs(arenaMetrics.astar.cost - 22.0) > 0.01) {
-      throw new Error(`Arena A* cost mismatch: expected 22.0, got ${arenaMetrics.astar.cost}`);
-    }
-    if (Math.abs(arenaMetrics.dijkstra.cost - 22.0) > 0.01) {
-      throw new Error(`Arena Dijkstra cost mismatch: expected 22.0, got ${arenaMetrics.dijkstra.cost}`);
-    }
+    assertFloatClose(arenaMetrics.bfs.cost, 30.0, 0.01, 'Weighted Arena BFS Cost');
+    assertFloatClose(arenaMetrics.astar.cost, 22.0, 0.01, 'Weighted Arena A* Cost');
+    assertFloatClose(arenaMetrics.dijkstra.cost, 22.0, 0.01, 'Weighted Arena Dijkstra Cost');
 
     // 5. Unreachable Target Authoritative Engine Verification
     console.log('\n[CHECK 5] Verifying Unreachable Goal Handling in Algorithm Core...');
@@ -247,27 +296,15 @@ async function runSmokeTest() {
     });
 
     console.log(`  -> Unreachable Goal: found=${unreachableRes.found}, pathLength=${unreachableRes.pathLength}`);
-    if (unreachableRes.found !== false || unreachableRes.pathLength !== 0) {
-      throw new Error(`Unreachable goal test failed: expected found=false, pathLength=0; got found=${unreachableRes.found}, pathLength=${unreachableRes.pathLength}`);
+    if (unreachableRes.found !== false) {
+      throw new Error(`Unreachable goal test failed: expected found=false, got ${unreachableRes.found}`);
     }
+    assertExactInt(unreachableRes.pathLength, 0, 'Unreachable Goal Path Length');
 
     // 6. Negative Test Harness Check (ensure failures are genuinely caught)
     console.log('\n[CHECK 6] Verifying Negative Test Failure Detection in Harness...');
-    let negativeTestCaught = false;
-    try {
-      const fakeValue = 999.0;
-      if (fakeValue !== 20.0) {
-        throw new Error('Intentional negative test check passed');
-      }
-    } catch (e) {
-      if (e.message.includes('Intentional negative test check passed')) {
-        negativeTestCaught = true;
-      }
-    }
-    if (!negativeTestCaught) {
-      throw new Error('Harness failed to trigger on intentional mismatch');
-    }
-    console.log('  -> Negative assertion rejection verified: true');
+    const negativeTestCount = runNegativeAssertionSelfTests();
+    console.log(`  -> Negative assertion rejection verified across ${negativeTestCount} deliberately invalid fixtures ✅`);
 
     // 7. Console Error Verification
     console.log('\n[CHECK 7] Verifying Zero Browser Console Errors...');

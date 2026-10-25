@@ -211,7 +211,7 @@ export const MISSIONS: MissionDefinition[] = [
     start: { r: 2, c: 2 },
     target: { r: 10, c: 20 },
     repairCharges: 2,
-    targetStepsForStar3: 22,
+    targetStepsForStar3: 26,
     environmentTheme: 'canyon',
     badgeLabel: 'CHALLENGE 02',
     initialDebris: [

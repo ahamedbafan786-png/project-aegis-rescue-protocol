@@ -1,0 +1,153 @@
+{
+  "timestamp": "2026-10-25T21:26:59.318Z",
+  "targetUrl": "http://localhost:4173/",
+  "totalAssertions": 420,
+  "passedAssertions": 420,
+  "results": [
+    {
+      "viewport": "320x844",
+      "mission": "mission-challenge-1",
+      "clearanceLeft2": 42.91,
+      "clearanceRight2": 16.52,
+      "clearanceLeft0": 42.91,
+      "clearanceRight0": 16.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "320x844",
+      "mission": "mission-challenge-2",
+      "clearanceLeft2": 42.91,
+      "clearanceRight2": 16.52,
+      "clearanceLeft0": 42.91,
+      "clearanceRight0": 16.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "360x800",
+      "mission": "mission-challenge-1",
+      "clearanceLeft2": 62.91,
+      "clearanceRight2": 36.52,
+      "clearanceLeft0": 62.91,
+      "clearanceRight0": 36.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "360x800",
+      "mission": "mission-challenge-2",
+      "clearanceLeft2": 62.91,
+      "clearanceRight2": 36.52,
+      "clearanceLeft0": 62.91,
+      "clearanceRight0": 36.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "375x812",
+      "mission": "mission-challenge-1",
+      "clearanceLeft2": 70.41,
+      "clearanceRight2": 44.02,
+      "clearanceLeft0": 70.41,
+      "clearanceRight0": 44.02,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "375x812",
+      "mission": "mission-challenge-2",
+      "clearanceLeft2": 70.41,
+      "clearanceRight2": 44.02,
+      "clearanceLeft0": 70.41,
+      "clearanceRight0": 44.02,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "390x844",
+      "mission": "mission-challenge-1",
+      "clearanceLeft2": 77.91,
+      "clearanceRight2": 51.52,
+      "clearanceLeft0": 77.91,
+      "clearanceRight0": 51.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "390x844",
+      "mission": "mission-challenge-2",
+      "clearanceLeft2": 77.91,
+      "clearanceRight2": 51.52,
+      "clearanceLeft0": 77.91,
+      "clearanceRight0": 51.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "430x932",
+      "mission": "mission-challenge-1",
+      "clearanceLeft2": 97.91,
+      "clearanceRight2": 71.52,
+      "clearanceLeft0": 97.91,
+      "clearanceRight0": 71.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "430x932",
+      "mission": "mission-challenge-2",
+      "clearanceLeft2": 97.91,
+      "clearanceRight2": 71.52,
+      "clearanceLeft0": 97.91,
+      "clearanceRight0": 71.52,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "543x589",
+      "mission": "mission-challenge-1",
+      "clearanceLeft2": 154.41,
+      "clearanceRight2": 128.02,
+      "clearanceLeft0": 154.41,
+      "clearanceRight0": 128.02,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    },
+    {
+      "viewport": "543x589",
+      "mission": "mission-challenge-2",
+      "clearanceLeft2": 154.41,
+      "clearanceRight2": 128.02,
+      "clearanceLeft0": 154.41,
+      "clearanceRight0": 128.02,
+      "badgeWidth": 76.2,
+      "toolsWidth": 71,
+      "telWidth": 97.4,
+      "pass": true
+    }
+  ],
+  "consoleErrors": []
+}

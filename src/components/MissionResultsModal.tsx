@@ -11,6 +11,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { sound } from '../game/soundEngine';
+import { calculateStarRating } from '../game/scoring';
 
 interface MissionResultsModalProps {
   isOpen: boolean;
@@ -49,14 +50,21 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Calculate Star Rating
-  let stars = 1;
-  if (stepsTaken <= targetStepsForStar3 * 1.3) stars = 2;
-  if (stepsTaken <= targetStepsForStar3 && replansCount <= 2) stars = 3;
+  // Calculate Star Rating using authoritative scoring engine
+  const scoring = calculateStarRating(
+    stepsTaken,
+    replansCount,
+    targetStepsForStar3
+  );
+  const stars = scoring.stars;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#17233D]/80 backdrop-blur-md select-none animate-in fade-in duration-200">
-      <div className="bg-gradient-to-b from-[#2B3B5B] to-[#1F2C47] border border-[#66DAD5]/40 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden">
+      <div
+        data-results-stars={stars}
+        data-results-target={targetStepsForStar3}
+        className="bg-gradient-to-b from-[#2B3B5B] to-[#1F2C47] border border-[#66DAD5]/40 rounded-3xl p-8 max-w-md w-full shadow-2xl flex flex-col items-center text-center relative overflow-hidden"
+      >
         {/* Close / Dismiss Button */}
         {onClose && (
           <button
@@ -87,7 +95,7 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
         </h2>
 
         {/* 3-Star Presentation */}
-        <div className="flex items-center gap-3 my-5">
+        <div className="flex items-center gap-3 my-4">
           {[1, 2, 3].map((starIdx) => (
             <div
               key={starIdx}
@@ -108,6 +116,12 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
           ))}
         </div>
 
+        {/* Rating Classification Badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#17233D]/90 border border-[#66DAD5]/30 text-xs font-mono font-bold text-[#66DAD5] mb-3">
+          <Sparkles className="w-3.5 h-3.5 text-[#F5CF79]" />
+          <span>{scoring.ratingLabel}</span>
+        </div>
+
         {/* Performance Metrics Cards */}
         <div className="w-full grid grid-cols-3 gap-2.5 my-2">
           <div className="bg-[#17233D]/90 p-3 rounded-xl border border-[#2B3B5B]">
@@ -126,10 +140,41 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
           </div>
         </div>
 
-        <p className="text-xs text-[#A1ADC7] mt-3 leading-relaxed">
-          {stars === 3
-            ? 'Optimal route executed with high algorithmic efficiency.'
-            : 'Mission accomplished. Further search pruning can optimize total steps.'}
+        {/* Star Rating Criteria Card */}
+        <div className="w-full bg-[#17233D]/70 p-3 rounded-xl border border-[#2B3B5B]/80 text-left my-2 text-[11px] font-mono">
+          <div className="text-[10px] text-[#66DAD5] font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3 text-[#66DAD5]" />
+            Scoring Benchmark Criteria
+          </div>
+          <div className="flex justify-between items-center py-0.5 text-[#A1ADC7]">
+            <span className="flex items-center gap-1">
+              <span className={stars >= 3 ? 'text-[#F5CF79]' : 'text-[#5A6E94]'}>★★★</span>
+              <span>Optimal Path:</span>
+            </span>
+            <span className={`font-bold ${stepsTaken <= targetStepsForStar3 && replansCount <= 2 ? 'text-[#86E3B4]' : 'text-[#F5F7FF]'}`}>
+              ≤ {targetStepsForStar3} steps &amp; ≤ 2 replans
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-0.5 text-[#A1ADC7]">
+            <span className="flex items-center gap-1">
+              <span className={stars >= 2 ? 'text-[#F5CF79]' : 'text-[#5A6E94]'}>★★☆</span>
+              <span>Efficient Route:</span>
+            </span>
+            <span className={`font-bold ${stepsTaken <= scoring.efficientStepThreshold ? 'text-[#86E3B4]' : 'text-[#F5F7FF]'}`}>
+              ≤ {scoring.efficientStepThreshold} steps
+            </span>
+          </div>
+          <div className="flex justify-between items-center py-0.5 text-[#A1ADC7]">
+            <span className="flex items-center gap-1">
+              <span className="text-[#F5CF79]">★☆☆</span>
+              <span>Mission Complete:</span>
+            </span>
+            <span className="font-bold text-[#86E3B4]">Survivor Extracted</span>
+          </div>
+        </div>
+
+        <p className="text-xs text-[#A1ADC7] mt-1 leading-relaxed">
+          {scoring.explanation}
         </p>
 
         {/* Action Buttons */}

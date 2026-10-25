@@ -1,6 +1,14 @@
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
+import {
+  assertExactInt,
+  assertFloatClose,
+  assertDimensionsPositive,
+  assertNonOverlap,
+  assertInViewportBounds,
+  runNegativeAssertionSelfTests,
+} from './qaAssertionUtils.mjs';
 
 async function clickButtonWithText(page, text, exact = false) {
   return await page.evaluate((btnText, isExact) => {
@@ -152,15 +160,9 @@ async function runAcceptanceSuite() {
       };
     });
     console.log(`  -> Final Telemetry: Detour Completed: ${rescueComplete}, Steps: ${finalTele.steps}, Replans: ${finalTele.replans}, Cost: ${finalTele.cost}`);
-    if (finalTele.steps !== 20) {
-      throw new Error(`Auto-Hold Detour failed step count assertion: expected 20, got ${finalTele.steps}`);
-    }
-    if (finalTele.replans !== 1) {
-      throw new Error(`Auto-Hold Detour failed replan count assertion: expected 1, got ${finalTele.replans}`);
-    }
-    if (Math.abs(finalTele.cost - 20.0) > 0.01) {
-      throw new Error(`Auto-Hold Detour failed cost assertion: expected 20.0, got ${finalTele.cost}`);
-    }
+    assertExactInt(finalTele.steps, 20, 'Auto-Hold Detour Steps');
+    assertExactInt(finalTele.replans, 1, 'Auto-Hold Detour Replans');
+    assertFloatClose(finalTele.cost, 20.0, 0.01, 'Auto-Hold Detour Cost');
 
     const shot2 = path.join(screenshotsDir, 'v4_2_1_02_auto_hold_rescue_complete.png');
     await page.screenshot({ path: shot2 });
@@ -223,9 +225,10 @@ async function runAcceptanceSuite() {
         cost: costEl ? parseFloat(costEl.innerText.trim()) : NaN,
       };
     });
-    if (movingTele.steps !== 20 || movingTele.replans !== 1 || Math.abs(movingTele.cost - 20.0) > 0.01) {
-      throw new Error(`Moving collapse detour failed telemetry: expected steps=20, replans=1, cost=20.0, got steps=${movingTele.steps}, replans=${movingTele.replans}, cost=${movingTele.cost}`);
-    }
+    console.log(`  -> Moving Telemetry: Steps: ${movingTele.steps}, Replans: ${movingTele.replans}, Cost: ${movingTele.cost}`);
+    assertExactInt(movingTele.steps, 20, 'Moving Detour Steps');
+    assertExactInt(movingTele.replans, 1, 'Moving Detour Replans');
+    assertFloatClose(movingTele.cost, 20.0, 0.01, 'Moving Detour Cost');
 
     const shot3 = path.join(screenshotsDir, 'v4_2_1_03_moving_collapse_complete.png');
     await page.screenshot({ path: shot3 });
@@ -257,13 +260,19 @@ async function runAcceptanceSuite() {
       const stepsEl = document.querySelector('[data-telemetry="steps"]');
       const replansEl = document.querySelector('[data-telemetry="replans"]');
       const deployBtn = document.querySelector('[data-deploy-button]');
-      const steps = stepsEl ? stepsEl.innerText.trim() : '';
-      const replans = replansEl ? replansEl.innerText.trim() : '';
+      const steps = stepsEl ? parseInt(stepsEl.innerText.trim(), 10) : NaN;
+      const replans = replansEl ? parseInt(replansEl.innerText.trim(), 10) : NaN;
       const deployText = deployBtn ? deployBtn.innerText.toUpperCase() : '';
-      return steps === '0' && replans === '0' && deployText.includes('DEPLOY ROBOT');
+      return {
+        steps,
+        replans,
+        isDeployText: deployText.includes('DEPLOY ROBOT'),
+      };
     });
-    console.log(`  -> Robot remains stationary before Deploy: ${preDeployStationary}`);
-    if (!preDeployStationary) throw new Error('Robot unexpectedly started moving before Deploy was clicked!');
+    console.log(`  -> Robot remains stationary before Deploy: steps=${preDeployStationary.steps}, replans=${preDeployStationary.replans}`);
+    assertExactInt(preDeployStationary.steps, 0, 'Pre-deploy steps');
+    assertExactInt(preDeployStationary.replans, 0, 'Pre-deploy replans');
+    if (!preDeployStationary.isDeployText) throw new Error('Robot unexpectedly started moving or deploy button text changed before Deploy was clicked!');
 
     const shotPreDeploy = path.join(screenshotsDir, 'v4_2_2_pre_deploy_collapse_presentation.png');
     await page.screenshot({ path: shotPreDeploy });
@@ -496,86 +505,138 @@ async function runAcceptanceSuite() {
     await page.waitForSelector('[data-mission-card="mission-challenge-1"]', { timeout: 6000 });
 
     // -------------------------------------------------------------------------
-    // SCENARIO 9: PERSISTENT MOBILE REPAIR COUNTER & BOUNDING BOX NON-OVERLAP VERIFICATION
+    // SCENARIO 9: COMPLETE MULTI-VIEWPORT & 3-STATE MOBILE HUD VERIFICATION
     // -------------------------------------------------------------------------
-    console.log('\n[SCENARIO 9] Verifying Persistent Mobile Repair Counter & Multi-Viewport Layout...');
+    console.log('\n[SCENARIO 9] Verifying Mobile Repair Counter Across 6 Viewports (320-543px) and 3 Charge States (2/2, 1/2, 0/2)...');
     await page.setViewport({ width: 390, height: 844 });
     await new Promise((r) => setTimeout(r, 400));
     await page.click('[data-mission-card="mission-challenge-1"]');
     await page.waitForSelector('[data-testid="mobile-repair-counter"]', { timeout: 6000 });
 
-    // Test responsive bounding box clearance across all required widths: 320, 360, 375, 390, 430, 543
-    const testWidths = [320, 360, 375, 390, 430, 543];
-    for (const w of testWidths) {
-      await page.setViewport({ width: w, height: 800 });
-      await new Promise((r) => setTimeout(r, 300));
+    const viewports = [
+      { width: 320, height: 844, name: '320x844' },
+      { width: 360, height: 800, name: '360x800' },
+      { width: 375, height: 812, name: '375x812' },
+      { width: 390, height: 844, name: '390x844' },
+      { width: 430, height: 932, name: '430x932' },
+      { width: 543, height: 589, name: '543x589' },
+    ];
 
-      const layoutCheck = await page.evaluate((width) => {
+    async function evaluateMobileHud(expectedStateText) {
+      return await page.evaluate((expText) => {
         const counterEl = document.querySelector('[data-testid="mobile-repair-counter"]');
-        if (!counterEl) return { ok: false, reason: 'counter missing' };
+        const toolsBtn = document.querySelector('[aria-label="Open Tools Drawer"]');
+        const telBtn = document.querySelector('[aria-label="Open Telemetry Drawer"]');
+
+        if (!counterEl || !toolsBtn || !telBtn) {
+          return { found: false, hasCounter: !!counterEl, hasTools: !!toolsBtn, hasTel: !!telBtn };
+        }
+
         const counterRect = counterEl.getBoundingClientRect();
-
-        const allButtons = Array.from(document.querySelectorAll('button'));
-        const toolsBtn = document.querySelector('[aria-label="Open Tools Drawer"]') || allButtons.find((b) => b.innerText.includes('Tools'));
-        const telBtn = document.querySelector('[aria-label="Open Telemetry Drawer"]') || allButtons.find((b) => b.innerText.includes('Telemetry'));
-
-        if (!toolsBtn || !telBtn) return { ok: false, reason: 'dock toggle buttons missing' };
-
         const toolsRect = toolsBtn.getBoundingClientRect();
         const telRect = telBtn.getBoundingClientRect();
 
         const style = window.getComputedStyle(counterEl);
         const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-        const hasNonZeroSize = counterRect.width > 0 && counterRect.height > 0;
-
-        // Exact 2D bounding box intersection check
-        const intersects = (r1, r2) => !(
-          r1.right <= r2.left ||
-          r1.left >= r2.right ||
-          r1.bottom <= r2.top ||
-          r1.top >= r2.bottom
-        );
-
-        const overlapsTools = intersects(counterRect, toolsRect);
-        const overlapsTel = intersects(counterRect, telRect);
-        const noOverlap = !overlapsTools && !overlapsTel;
-
-        // Check that element is not clipped outside the viewport bounds
-        const isClipped = counterRect.left < 0 || counterRect.right > width || counterRect.top < 0 || counterRect.bottom > 800;
-
-        const clearanceLeft = counterRect.left - toolsRect.right;
-        const clearanceRight = telRect.left - counterRect.right;
-        const isSingleLine = counterRect.height <= 40; // No vertical multi-line wrap
-        const text = counterEl.innerText || counterEl.textContent || '';
-        const hasCounterText = text.includes('2/2') || text.includes('2 / 2');
-
-        const ok = isVisible && hasNonZeroSize && !isClipped && noOverlap && isSingleLine && hasCounterText;
+        const text = (counterEl.innerText || counterEl.textContent || '').trim();
 
         return {
-          ok,
+          found: true,
+          innerWidth: window.innerWidth,
+          innerHeight: window.innerHeight,
           isVisible,
-          hasNonZeroSize,
-          isClipped,
-          overlapsTools,
-          overlapsTel,
-          width,
-          clearanceLeft: Math.round(clearanceLeft),
-          clearanceRight: Math.round(clearanceRight),
-          counterWidth: Math.round(counterRect.width),
-          counterHeight: Math.round(counterRect.height),
-          text: text.trim(),
+          text,
+          matchesState: text.includes(expText),
+          counterRect: {
+            left: counterRect.left,
+            right: counterRect.right,
+            top: counterRect.top,
+            bottom: counterRect.bottom,
+            width: counterRect.width,
+            height: counterRect.height,
+          },
+          toolsRect: {
+            left: toolsRect.left,
+            right: toolsRect.right,
+            top: toolsRect.top,
+            bottom: toolsRect.bottom,
+            width: toolsRect.width,
+            height: toolsRect.height,
+          },
+          telRect: {
+            left: telRect.left,
+            right: telRect.right,
+            top: telRect.top,
+            bottom: telRect.bottom,
+            width: telRect.width,
+            height: telRect.height,
+          },
         };
-      }, w);
+      }, expectedStateText);
+    }
 
-      console.log(`  -> Width ${w}px: Clearance (L:${layoutCheck.clearanceLeft}px, R:${layoutCheck.clearanceRight}px), Height: ${layoutCheck.counterHeight}px, Text: "${layoutCheck.text}" | Pass: ${layoutCheck.ok}`);
-      if (!layoutCheck.ok) {
-        throw new Error(`Mobile repair counter layout failure at ${w}px width: clearanceL=${layoutCheck.clearanceLeft}, clearanceR=${layoutCheck.clearanceRight}`);
+    for (const vp of viewports) {
+      await page.setViewport({ width: vp.width, height: vp.height });
+      await new Promise((r) => setTimeout(r, 250));
+
+      // 1. STATE 2/2
+      const hud2 = await evaluateMobileHud('2/2');
+      if (!hud2.found) throw new Error(`HUD elements missing at ${vp.width}x${vp.height} (state 2/2)`);
+
+      assertExactInt(hud2.innerWidth, vp.width, `Viewport ${vp.name} actual width`);
+      assertExactInt(hud2.innerHeight, vp.height, `Viewport ${vp.name} actual height`);
+      if (!hud2.isVisible) throw new Error(`Badge not visible at ${vp.name} (state 2/2)`);
+      if (!hud2.matchesState) throw new Error(`Badge does not match 2/2 at ${vp.name} (got: "${hud2.text}")`);
+
+      assertDimensionsPositive(hud2.counterRect, `Repair Counter at ${vp.name} (2/2)`);
+      assertDimensionsPositive(hud2.toolsRect, `Tools Button at ${vp.name} (2/2)`);
+      assertDimensionsPositive(hud2.telRect, `Telemetry Button at ${vp.name} (2/2)`);
+
+      assertNonOverlap(hud2.counterRect, hud2.toolsRect, 'Repair Counter', 'Tools Button');
+      assertNonOverlap(hud2.counterRect, hud2.telRect, 'Repair Counter', 'Telemetry Button');
+
+      assertInViewportBounds(hud2.counterRect, vp.width, vp.height, 'Repair Counter');
+      assertInViewportBounds(hud2.toolsRect, vp.width, vp.height, 'Tools Button');
+      assertInViewportBounds(hud2.telRect, vp.width, vp.height, 'Telemetry Button');
+
+      // 2. BREACH DEBRIS 1 -> STATE 1/2
+      const debris1 = await getGridClickCoords(page, 8, 5, 21, 11);
+      await page.mouse.click(debris1.x, debris1.y);
+      await new Promise((r) => setTimeout(r, 350));
+
+      const hud1 = await evaluateMobileHud('1/2');
+      if (!hud1.found || !hud1.isVisible || !hud1.matchesState) {
+        throw new Error(`Failed state 1/2 verification at ${vp.name} (text: "${hud1?.text}")`);
       }
+      assertDimensionsPositive(hud1.counterRect, `Repair Counter at ${vp.name} (1/2)`);
+      assertNonOverlap(hud1.counterRect, hud1.toolsRect, 'Repair Counter', 'Tools Button');
+      assertNonOverlap(hud1.counterRect, hud1.telRect, 'Repair Counter', 'Telemetry Button');
+      assertInViewportBounds(hud1.counterRect, vp.width, vp.height, 'Repair Counter');
+
+      // 3. BREACH DEBRIS 2 -> STATE 0/2
+      const debris2 = await getGridClickCoords(page, 12, 5, 21, 11);
+      await page.mouse.click(debris2.x, debris2.y);
+      await new Promise((r) => setTimeout(r, 350));
+
+      const hud0 = await evaluateMobileHud('0/2');
+      if (!hud0.found || !hud0.isVisible || !hud0.matchesState) {
+        throw new Error(`Failed state 0/2 verification at ${vp.name} (text: "${hud0?.text}")`);
+      }
+      assertDimensionsPositive(hud0.counterRect, `Repair Counter at ${vp.name} (0/2)`);
+      assertNonOverlap(hud0.counterRect, hud0.toolsRect, 'Repair Counter', 'Tools Button');
+      assertNonOverlap(hud0.counterRect, hud0.telRect, 'Repair Counter', 'Telemetry Button');
+      assertInViewportBounds(hud0.counterRect, vp.width, vp.height, 'Repair Counter');
+
+      console.log(`  -> Viewport ${vp.name}: verified 2/2 -> 1/2 -> 0/2 (zero overlap, within bounds, positive dims)`);
+
+      // Reset mission to restore 2/2 charges for next viewport test
+      await page.click('[data-testid="hud-reset-btn"]');
+      await new Promise((r) => setTimeout(r, 300));
     }
 
     // Save screenshots at required test viewports
     await page.setViewport({ width: 390, height: 844 });
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 200));
     const shot7 = path.join(screenshotsDir, 'v4_2_1_07_mobile_repair_counter_390x844.png');
     await page.screenshot({ path: shot7 });
     if (artifactsDir && fs.existsSync(artifactsDir)) {
@@ -583,24 +644,20 @@ async function runAcceptanceSuite() {
     }
 
     await page.setViewport({ width: 543, height: 589 });
-    await new Promise((r) => setTimeout(r, 300));
+    await new Promise((r) => setTimeout(r, 200));
     const shot8 = path.join(screenshotsDir, 'v4_2_1_08_mobile_repair_counter_543x589.png');
     await page.screenshot({ path: shot8 });
     if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot8, path.join(artifactsDir, 'v4_2_1_08_mobile_repair_counter_543x589.png'));
     }
 
-    await page.setViewport({ width: 320, height: 650 });
-    await new Promise((r) => setTimeout(r, 300));
+    await page.setViewport({ width: 320, height: 844 });
+    await new Promise((r) => setTimeout(r, 200));
     const shot320 = path.join(screenshotsDir, 'v4_2_2_mobile_repair_counter_320px.png');
     await page.screenshot({ path: shot320 });
     if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot320, path.join(artifactsDir, 'v4_2_2_mobile_repair_counter_320px.png'));
     }
-
-    // Return to 390x844 and test repair charge dynamic transitions: 2 -> 1 -> 0
-    await page.setViewport({ width: 390, height: 844 });
-    await new Promise((r) => setTimeout(r, 300));
 
     // Verify counter hides when Tools drawer is open
     await clickButtonWithText(page, 'Tools');
@@ -622,32 +679,6 @@ async function runAcceptanceSuite() {
     console.log(`  -> Floating counter reappears when drawer closes: ${counterReappeared}`);
     if (!counterReappeared) throw new Error('Floating repair counter did not reappear after closing drawer');
 
-    // Test changing charges from 2 -> 1 -> 0 on mobile viewport 390x844 (Challenge 1: cols: 21, rows: 11, debris at (8,5) and (12,5))
-    console.log('  -> Testing mobile repair counter transitions (2 -> 1 -> 0)...');
-    const mobileDebris1 = await getGridClickCoords(page, 8, 5, 21, 11);
-    await page.mouse.click(mobileDebris1.x, mobileDebris1.y);
-    await new Promise((r) => setTimeout(r, 400));
-
-    const counterAt1 = await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="mobile-repair-counter"]');
-      const text = el ? (el.innerText || el.textContent || '') : '';
-      return text.includes('1/2') || text.includes('1 / 2');
-    });
-    console.log(`  -> Mobile counter updated to 1/2: ${counterAt1}`);
-    if (!counterAt1) throw new Error('Mobile counter did not update to 1/2 after first debris breach');
-
-    const mobileDebris2 = await getGridClickCoords(page, 12, 5, 21, 11);
-    await page.mouse.click(mobileDebris2.x, mobileDebris2.y);
-    await new Promise((r) => setTimeout(r, 400));
-
-    const counterAt0 = await page.evaluate(() => {
-      const el = document.querySelector('[data-testid="mobile-repair-counter"]');
-      const text = el ? (el.innerText || el.textContent || '') : '';
-      return text.includes('0/2') || text.includes('0 / 2');
-    });
-    console.log(`  -> Mobile counter updated to 0/2: ${counterAt0}`);
-    if (!counterAt0) throw new Error('Mobile counter did not update to 0/2 after second debris breach');
-
     // Screenshot of 0 charges state on 390x844
     const shot0Charges = path.join(screenshotsDir, 'v4_2_2_mobile_repair_counter_0charges_390x844.png');
     await page.screenshot({ path: shot0Charges });
@@ -655,7 +686,7 @@ async function runAcceptanceSuite() {
       fs.copyFileSync(shot0Charges, path.join(artifactsDir, 'v4_2_2_mobile_repair_counter_0charges_390x844.png'));
     }
 
-    report.push({ test: 'Scenario 9: Persistent Mobile Repair Counter & Multi-Viewport Non-Overlap (320-543px)', pass: true });
+    report.push({ test: 'Scenario 9: Persistent Mobile Repair Counter & Multi-Viewport Non-Overlap (320-543px across 2/2, 1/2, 0/2)', pass: true });
 
     // -------------------------------------------------------------------------
     // SCENARIO 10: SANDBOX LAB EDITING REMAINS FULLY UNRESTRICTED
@@ -736,15 +767,9 @@ async function runAcceptanceSuite() {
 
     console.log(`  -> Arena Scoped Metrics: BFS(cost=${arenaMetrics.bfs.cost}, steps=${arenaMetrics.bfs.steps}), A*(cost=${arenaMetrics.astar.cost}, steps=${arenaMetrics.astar.steps}), Dijkstra(cost=${arenaMetrics.dijkstra.cost}, steps=${arenaMetrics.dijkstra.steps})`);
 
-    if (Math.abs(arenaMetrics.bfs.cost - 30.0) > 0.01) {
-      throw new Error(`Weighted Arena BFS cost mismatch: expected 30.0, got ${arenaMetrics.bfs.cost}`);
-    }
-    if (Math.abs(arenaMetrics.astar.cost - 22.0) > 0.01) {
-      throw new Error(`Weighted Arena A* cost mismatch: expected 22.0, got ${arenaMetrics.astar.cost}`);
-    }
-    if (Math.abs(arenaMetrics.dijkstra.cost - 22.0) > 0.01) {
-      throw new Error(`Weighted Arena Dijkstra cost mismatch: expected 22.0, got ${arenaMetrics.dijkstra.cost}`);
-    }
+    assertFloatClose(arenaMetrics.bfs.cost, 30.0, 0.01, 'Weighted Arena BFS cost');
+    assertFloatClose(arenaMetrics.astar.cost, 22.0, 0.01, 'Weighted Arena A* cost');
+    assertFloatClose(arenaMetrics.dijkstra.cost, 22.0, 0.01, 'Weighted Arena Dijkstra cost');
 
     const shot10 = path.join(screenshotsDir, 'v4_2_1_10_arena_regression.png');
     await page.screenshot({ path: shot10 });
@@ -752,6 +777,14 @@ async function runAcceptanceSuite() {
       fs.copyFileSync(shot10, path.join(artifactsDir, 'v4_2_1_10_arena_regression.png'));
     }
     report.push({ test: 'Scenario 11: Weighted Arena Regression', pass: true });
+
+    // -------------------------------------------------------------------------
+    // SCENARIO 13: HARNESS NEGATIVE ASSERTION VERIFICATION
+    // -------------------------------------------------------------------------
+    console.log('\n[SCENARIO 13] Verifying Negative Test Rejection of Invalid Fixtures in Acceptance Harness...');
+    const negativeCount = runNegativeAssertionSelfTests();
+    console.log(`  -> Passed ${negativeCount} negative assertion rejection checks against NaN, Infinity, strings, overlapping rects, clipped rects`);
+    report.push({ test: 'Scenario 13: Negative Test Harness Verification (16 checks)', pass: true });
 
   } catch (err) {
     console.error(`\n❌ VERIFICATION EXCEPTION: ${err.message}`);

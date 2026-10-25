@@ -5,7 +5,7 @@
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-project--aegis--theta.vercel.app-66DAD5?style=for-the-badge&logo=vercel)](https://project-aegis-theta.vercel.app/)
 [![CI](https://github.com/ahamedbafan786-png/project-aegis-rescue-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/ahamedbafan786-png/project-aegis-rescue-protocol/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Tests: Vitest](https://img.shields.io/badge/Tests-54%2F54%20Passing-brightgreen?style=for-the-badge&logo=vitest)](tests)
+[![Tests: Vitest](https://img.shields.io/badge/Tests-68%2F68%20Passing-brightgreen?style=for-the-badge&logo=vitest)](tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0%20Strict-blue?style=for-the-badge&logo=typescript)](tsconfig.json)
 [![React](https://img.shields.io/badge/React-19.3-61DAFB?style=for-the-badge&logo=react)](package.json)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38B2AC?style=for-the-badge&logo=tailwind-css)](src/index.css)
@@ -22,7 +22,7 @@ Experience the live, interactive deployment directly in your browser:
 
 ### 🎮 **[https://project-aegis-theta.vercel.app/](https://project-aegis-theta.vercel.app/)**
 
-*Zero installation required. Works on all modern desktop, tablet, and mobile browsers.*
+*Zero installation required. Verified on Chromium-based desktop (1440×900, 1280×800) and mobile CSS viewports (320px to 543px).*
 
 ---
 
@@ -90,7 +90,7 @@ All screenshots below are captured from live production runs of the application.
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) | Modern utility-first CSS engine with custom color palettes |
 | **Graphics Engine** | HTML5 Canvas 2D | Custom render pipeline with delta-time animation loop and particle physics |
 | **Audio** | Web Audio API | Procedural waveform synthesis (sine, square, sawtooth) with gain nodes |
-| **Unit Testing** | [Vitest 5.0](https://vitest.dev/) | 63 automated tests verifying admissibility, min-heap properties, and replanning |
+| **Unit Testing** | [Vitest 5.0](https://vitest.dev/) | 68 automated tests across 8 suites verifying admissibility, min-heap properties, replanning, and star scoring |
 | **Browser QA** | [Puppeteer](https://pptr.dev/) | End-to-end automated screenshot verification across viewport sizes |
 | **Hosting** | [Vercel](https://vercel.com/) | Continuous deployment with global edge CDN delivery |
 
@@ -193,9 +193,11 @@ npm test
  ✓ tests/challengeMechanic.test.ts (4 tests)
  ✓ tests/astar.test.ts (12 tests)
  ✓ tests/v4_2_1_gameplay_integrity.test.ts (26 tests)
+ ✓ tests/v4_2_2_stability_mobile.test.ts (9 tests)
+ ✓ tests/scoring.test.ts (5 tests)
 
- Test Files  6 passed (6)
-      Tests  54 passed (54)
+ Test Files  8 passed (8)
+      Tests  68 passed (68)
 ```
 
 Key verified behaviors:
@@ -205,6 +207,25 @@ Key verified behaviors:
 - Mid-transit dynamic replanning and detour selection.
 - Ordinary structural wall demolition immunity.
 - Mobile repair counter synchronization and drawer exclusivity.
+- Deep Vault Quarantine optimal path traversal (26 steps) and 3-star scoring calculation.
+
+### Automated Browser QA & CI Smoke Tests
+Project Aegis includes automated headless Chromium verification scripts powered by Puppeteer:
+
+- **CI Browser Smoke Test (`npm run test:smoke` / `scripts/qaSmokeCI.mjs`)**:
+  - Validates document metadata, OpenGraph tags, and Twitter card headers.
+  - Verifies Presentation Mode Auto-Hold dynamic A* replanning with exact scoped telemetry (`steps = 20`, `replans = 1`, `cost = 20.0`).
+  - Asserts mobile repair counter non-overlap and viewport bounds across mobile dimensions (390×844 and 320×844).
+  - Validates Algorithm Arena benchmark metrics on weighted terrain (`BFS = 30.0`, `A* = 22.0`, `Dijkstra = 22.0`).
+  - Verifies engine handling of fully unreachable goals.
+  - Executes 16 negative test assertions against intentionally malformed fixtures (`NaN`, `Infinity`, strings, overlapping rects, out-of-bounds coords).
+  - Asserts zero browser console errors.
+
+- **Mobile Freeze Gate (`scripts/verifyMobileFreezeGate.mjs` & `npm run test:e2e`)**:
+  - Tests 6 distinct mobile CSS viewports: `320×844`, `360×800`, `375×812`, `390×844`, `430×932`, `543×589`.
+  - Verifies all 3 repair-charge states (`2/2`, `1/2`, `0/2`) for both Challenge Missions.
+  - Enforces zero 2D bounding box intersection between the repair badge and drawer dock buttons.
+  - Confirms zero clipping outside viewport boundaries and strictly positive dimensions.
 
 ### Run Code Linter
 ```bash
@@ -240,18 +261,20 @@ project-aegis-rescue-protocol/
 │   │   ├── editPermissions.ts    # Centralized mission edit permissions
 │   │   ├── gridModel.ts          # Matrix representation & topology generator
 │   │   ├── robotController.ts    # State machine & dynamic replanning observer
+│   │   ├── scoring.ts            # Mission performance & 3-star rating engine
 │   │   └── soundEngine.ts        # Synthesized Web Audio API sound generator
 │   ├── missions/            # Mission definitions & disaster topographies
 │   │   └── missionData.ts
 │   ├── App.tsx              # Application root state & screen routing
 │   ├── index.css            # Tailwind CSS styling & custom effects
 │   └── main.tsx             # Application DOM mounting point
-├── tests/                   # Automated Vitest test suites (63 unit tests across 7 suites)
+├── tests/                   # Automated Vitest test suites (68 unit tests across 8 suites)
 │   ├── astar.test.ts
 │   ├── challengeMechanic.test.ts
 │   ├── heuristics.test.ts
 │   ├── minHeap.test.ts
 │   ├── robotCostAccounting.test.ts
+│   ├── scoring.test.ts
 │   ├── v4_2_1_gameplay_integrity.test.ts
 │   └── v4_2_2_stability_mobile.test.ts
 ├── screenshots/             # High-resolution gameplay captures
