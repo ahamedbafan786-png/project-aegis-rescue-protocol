@@ -3,11 +3,12 @@
 > *"One robot. Impossible terrain. Every second counts."*
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-project--aegis--theta.vercel.app-66DAD5?style=for-the-badge&logo=vercel)](https://project-aegis-theta.vercel.app/)
+[![CI](https://github.com/ahamedbafan786-png/project-aegis-rescue-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/ahamedbafan786-png/project-aegis-rescue-protocol/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Tests: Vitest](https://img.shields.io/badge/Tests-54%2F54%20Passing-brightgreen?style=for-the-badge&logo=vitest)](tests)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8%20Strict-blue?style=for-the-badge&logo=typescript)](tsconfig.json)
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](package.json)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38B2AC?style=for-the-badge&logo=tailwind-css)](src/index.css)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0%20Strict-blue?style=for-the-badge&logo=typescript)](tsconfig.json)
+[![React](https://img.shields.io/badge/React-19.3-61DAFB?style=for-the-badge&logo=react)](package.json)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4.3-38B2AC?style=for-the-badge&logo=tailwind-css)](src/index.css)
 
 **Project Aegis: Rescue Protocol** is an interactive, game-like autonomous robot pathfinding demonstration developed in pure TypeScript, React 19, and HTML5 Canvas. Built for students, software engineers, roboticists, and algorithm enthusiasts, it brings formal graph traversal algorithms to life inside a responsive, sci-fi tactical simulation.
 
@@ -50,7 +51,7 @@ All screenshots below are captured from live production runs of the application.
 ![Challenge Missions](screenshots/v4_2_1_04_ordinary_wall_immunity.png)
 
 ### 6. Algorithm Arena (Comparative Benchmark)
-*Side-by-side performance analysis comparing A*, Dijkstra's Algorithm, and Breadth-First Search (BFS) on identical topologies with live node expansion telemetry.*
+*Side-by-side performance analysis comparing `A*`, `Dijkstra`, and `BFS` on identical topologies with live node expansion telemetry.*
 ![Algorithm Arena](screenshots/v4_2_07_arena_bfs_label.png)
 
 ### 7. Rescue Completion & Debriefing
@@ -147,8 +148,8 @@ Both A* and Dijkstra naturally discover that routing through up to 2 empty floor
 ## Installation and Running Locally
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) v18.0.0 or higher
-- `npm` v9.0.0 or higher
+- [Node.js](https://nodejs.org/) v22.12.0 or higher (LTS recommended)
+- `npm` v10.0.0 or higher
 
 ### 1. Clone the Repository
 ```bash

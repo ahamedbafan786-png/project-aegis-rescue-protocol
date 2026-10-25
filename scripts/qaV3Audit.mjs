@@ -15,8 +15,13 @@ async function clickButtonWithText(page, text) {
 }
 
 async function runV3Audit() {
-  const screenshotsDir = path.resolve('screenshots');
-  const artifactsDir = 'C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be';
+  const screenshotsDir = process.env.SCREENSHOTS_DIR || path.resolve('screenshots');
+  const artifactsDir = process.env.ARTIFACTS_DIR || null;
+  const saveArtifact = (src, name) => {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
+      fs.copyFileSync(src, path.join(artifactsDir, name));
+    }
+  };
 
   if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -52,7 +57,7 @@ async function runV3Audit() {
     await new Promise((r) => setTimeout(r, 600));
     const ss1Path = path.join(screenshotsDir, 'v3_01_main_menu.png');
     await page.screenshot({ path: ss1Path });
-    fs.copyFileSync(ss1Path, path.join(artifactsDir, 'v3_01_main_menu.png'));
+    saveArtifact(ss1Path, 'v3_01_main_menu.png');
     report.checks.push({ test: 'Main Menu Render', status: 'PASS' });
     console.log('✓ Main menu captured');
 
@@ -62,7 +67,7 @@ async function runV3Audit() {
     await new Promise((r) => setTimeout(r, 600));
     const ss2Path = path.join(screenshotsDir, 'v3_02_mission_select.png');
     await page.screenshot({ path: ss2Path });
-    fs.copyFileSync(ss2Path, path.join(artifactsDir, 'v3_02_mission_select.png'));
+    saveArtifact(ss2Path, 'v3_02_mission_select.png');
     report.checks.push({ test: 'Mission Select Render', status: 'PASS' });
     console.log('✓ Mission select captured');
 
@@ -90,7 +95,7 @@ async function runV3Audit() {
 
     const ss3Path = path.join(screenshotsDir, 'v3_03_mission1_initial.png');
     await page.screenshot({ path: ss3Path });
-    fs.copyFileSync(ss3Path, path.join(artifactsDir, 'v3_03_mission1_initial.png'));
+    saveArtifact(ss3Path, 'v3_03_mission1_initial.png');
     console.log('✓ Mission 1 initial gameplay captured');
 
     // 4. DEPLOY ROBOT & TRANSIT
@@ -100,7 +105,7 @@ async function runV3Audit() {
 
     const ss4Path = path.join(screenshotsDir, 'v3_04_robot_in_transit.png');
     await page.screenshot({ path: ss4Path });
-    fs.copyFileSync(ss4Path, path.join(artifactsDir, 'v3_04_robot_in_transit.png'));
+    saveArtifact(ss4Path, 'v3_04_robot_in_transit.png');
     console.log('✓ Robot in transit captured');
 
     // 5. TRIGGER DYNAMIC BLOCKAGE & VERIFY COST CONTINUITY
@@ -111,7 +116,7 @@ async function runV3Audit() {
 
     const ss5Path = path.join(screenshotsDir, 'v3_05_dynamic_replanning_active.png');
     await page.screenshot({ path: ss5Path });
-    fs.copyFileSync(ss5Path, path.join(artifactsDir, 'v3_05_dynamic_replanning_active.png'));
+    saveArtifact(ss5Path, 'v3_05_dynamic_replanning_active.png');
     console.log('✓ Dynamic replanning visual storytelling captured (shockwave + invalidated dashed route)');
 
     // 6. FINISH MISSION & VERIFY TELEMETRY MODAL
@@ -130,7 +135,7 @@ async function runV3Audit() {
 
     const ss6Path = path.join(screenshotsDir, 'v3_06_mission_results_modal.png');
     await page.screenshot({ path: ss6Path });
-    fs.copyFileSync(ss6Path, path.join(artifactsDir, 'v3_06_mission_results_modal.png'));
+    saveArtifact(ss6Path, 'v3_06_mission_results_modal.png');
     console.log('✓ Victory results dialog captured');
 
     // 7. VERIFY NO MODAL LEAKAGE TO ALGORITHM ARENA
@@ -158,7 +163,7 @@ async function runV3Audit() {
 
     const ss7Path = path.join(screenshotsDir, 'v3_07_algorithm_arena.png');
     await page.screenshot({ path: ss7Path });
-    fs.copyFileSync(ss7Path, path.join(artifactsDir, 'v3_07_algorithm_arena.png'));
+    saveArtifact(ss7Path, 'v3_07_algorithm_arena.png');
     console.log('✓ Algorithm Arena captured with clean isolation');
 
     // 8. PRESENTATION MODE
@@ -182,14 +187,14 @@ async function runV3Audit() {
 
     const ss8Path = path.join(screenshotsDir, 'v3_08_presentation_mode.png');
     await page.screenshot({ path: ss8Path });
-    fs.copyFileSync(ss8Path, path.join(artifactsDir, 'v3_08_presentation_mode.png'));
+    saveArtifact(ss8Path, 'v3_08_presentation_mode.png');
 
     // Toggle notes open
     await clickButtonWithText(page, 'Presenter Notes');
     await new Promise((r) => setTimeout(r, 400));
     const ss9Path = path.join(screenshotsDir, 'v3_09_presentation_with_notes.png');
     await page.screenshot({ path: ss9Path });
-    fs.copyFileSync(ss9Path, path.join(artifactsDir, 'v3_09_presentation_with_notes.png'));
+    saveArtifact(ss9Path, 'v3_09_presentation_with_notes.png');
     console.log('✓ Presentation Mode captured (collapsed and toggled)');
 
     // 9. NARROW VIEWPORT (543 x 589)
@@ -218,7 +223,7 @@ async function runV3Audit() {
 
     const ss10Path = path.join(screenshotsDir, 'v3_10_narrow_543x589.png');
     await page.screenshot({ path: ss10Path });
-    fs.copyFileSync(ss10Path, path.join(artifactsDir, 'v3_10_narrow_543x589.png'));
+    saveArtifact(ss10Path, 'v3_10_narrow_543x589.png');
     console.log('✓ 543x589 narrow viewport captured without overflow');
 
     // 10. MOBILE PORTRAIT (390 x 844)
@@ -227,7 +232,7 @@ async function runV3Audit() {
     await new Promise((r) => setTimeout(r, 600));
     const ss11Path = path.join(screenshotsDir, 'v3_11_mobile_390x844.png');
     await page.screenshot({ path: ss11Path });
-    fs.copyFileSync(ss11Path, path.join(artifactsDir, 'v3_11_mobile_390x844.png'));
+    saveArtifact(ss11Path, 'v3_11_mobile_390x844.png');
     console.log('✓ Mobile 390x844 portrait captured');
 
   } catch (err) {

@@ -51,15 +51,15 @@ Project Aegis V4.2.1 resolves three critical P0 gameplay integrity defects and d
 
 | File | Change Scope & Architectural Significance |
 | :--- | :--- |
-| [`src/game/robotController.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/game/robotController.ts) | 1. Extended `pause(customMessage?: string)` to accept dynamic status messages.<br>2. Added `autoHoldAtCurrent()` to snap `visualX = logicalPos.c`, `visualY = logicalPos.r`, `transitionProgress = 0`.<br>3. Updated `checkPathBlocked` to permit inspection when `robot.state === 'IDLE'`.<br>4. Snapped integer coordinates on blockage detection to guarantee clean A* path origin. |
-| [`src/components/PresentationMode.tsx`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/components/PresentationMode.tsx) | 1. Updated `autoHoldFired` hook to trigger `robot.autoHoldAtCurrent()` and set status message `AUTO-HOLD ACTIVE — READY FOR COLLAPSE`.<br>2. Updated `handleTriggerBlockage` to directly call `robot.checkPathBlocked`, calculate the upper bypass via row 3, update `activePath`, and resume transit.<br>3. Guaranteed presentation status renders `AUTO-HOLD ACTIVE — READY FOR COLLAPSE` while held. |
-| [`src/game/editPermissions.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/game/editPermissions.ts) | **New Centralized Authority File**: Defines `getGameMode`, `isTileDesignatedDebris`, `isInitialMissionWall`, `canEditTile`, `canClearObstacles`, and `canGenerateTopology`. Encapsulates mode-specific authorization rules. |
-| [`src/components/GameHUD.tsx`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/components/GameHUD.tsx) | 1. Integrated `canEditTile`, `canClearObstacles`, and `canGenerateTopology`.<br>2. Restricted Challenge Mode Tools drawer to only show Demolish Debris (hiding Wall, Rough, Eraser, Clear, Maze, and Random tools).<br>3. Replaced ad-hoc tile demolition with `canEditTile` permission checking (rejecting structural walls with `STRUCTURAL WALL — CANNOT BREACH`).<br>4. Added persistent mobile repair counter `[data-testid="mobile-repair-counter"]` in the canvas area when drawers are closed. |
-| [`src/missions/missionData.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/missions/missionData.ts) | Synchronized Corridor Control briefing text: "blast open the direct corridor (16 steps, cost 16) or conserve them and let A* navigate the 24-step northern detour (cost 24)". |
-| [`src/components/Navbar.tsx`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/components/Navbar.tsx) | 1. Updated version badge to `A* V4.2.1`.<br>2. Added `data-nav-item="menu"` on brand logo for automated test navigation. |
-| [`src/components/MissionResultsModal.tsx`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/components/MissionResultsModal.tsx) | Resolved React hook order violation by lifting `useEffect` above conditional return `if (!isOpen) return null;`. |
-| [`tests/v4_2_1_gameplay_integrity.test.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/tests/v4_2_1_gameplay_integrity.test.ts) | **New Test Suite**: 26 unit & integration tests covering Auto-Hold coordinate snapping, path blockage, permission boundaries, repair charge lifecycle, and zero-charge guards. |
-| [`scripts/qaV4_2_1Acceptance.mjs`](file:///c:/Users/Ahmed/Downloads/DAA%20project/scripts/qaV4_2_1Acceptance.mjs) | **New E2E Browser Suite**: 12 end-to-end scenarios covering desktop & mobile viewports, canvas interactions, and console cleanliness. |
+| [`src/game/robotController.ts`](src/game/robotController.ts) | 1. Extended `pause(customMessage?: string)` to accept dynamic status messages.<br>2. Added `autoHoldAtCurrent()` to snap `visualX = logicalPos.c`, `visualY = logicalPos.r`, `transitionProgress = 0`.<br>3. Updated `checkPathBlocked` to permit inspection when `robot.state === 'IDLE'`.<br>4. Snapped integer coordinates on blockage detection to guarantee clean A* path origin. |
+| [`src/components/PresentationMode.tsx`](src/components/PresentationMode.tsx) | 1. Updated `autoHoldFired` hook to trigger `robot.autoHoldAtCurrent()` and set status message `AUTO-HOLD ACTIVE — READY FOR COLLAPSE`.<br>2. Updated `handleTriggerBlockage` to directly call `robot.checkPathBlocked`, calculate the upper bypass via row 3, update `activePath`, and resume transit.<br>3. Guaranteed presentation status renders `AUTO-HOLD ACTIVE — READY FOR COLLAPSE` while held. |
+| [`src/game/editPermissions.ts`](src/game/editPermissions.ts) | **New Centralized Authority File**: Defines `getGameMode`, `isTileDesignatedDebris`, `isInitialMissionWall`, `canEditTile`, `canClearObstacles`, and `canGenerateTopology`. Encapsulates mode-specific authorization rules. |
+| [`src/components/GameHUD.tsx`](src/components/GameHUD.tsx) | 1. Integrated `canEditTile`, `canClearObstacles`, and `canGenerateTopology`.<br>2. Restricted Challenge Mode Tools drawer to only show Demolish Debris (hiding Wall, Rough, Eraser, Clear, Maze, and Random tools).<br>3. Replaced ad-hoc tile demolition with `canEditTile` permission checking (rejecting structural walls with `STRUCTURAL WALL — CANNOT BREACH`).<br>4. Added persistent mobile repair counter `[data-testid="mobile-repair-counter"]` in the canvas area when drawers are closed. |
+| [`src/missions/missionData.ts`](src/missions/missionData.ts) | Synchronized Corridor Control briefing text: "blast open the direct corridor (16 steps, cost 16) or conserve them and let A* navigate the 24-step northern detour (cost 24)". |
+| [`src/components/Navbar.tsx`](src/components/Navbar.tsx) | 1. Updated version badge to `A* V4.2.1`.<br>2. Added `data-nav-item="menu"` on brand logo for automated test navigation. |
+| [`src/components/MissionResultsModal.tsx`](src/components/MissionResultsModal.tsx) | Resolved React hook order violation by lifting `useEffect` above conditional return `if (!isOpen) return null;`. |
+| [`tests/v4_2_1_gameplay_integrity.test.ts`](tests/v4_2_1_gameplay_integrity.test.ts) | **New Test Suite**: 26 unit & integration tests covering Auto-Hold coordinate snapping, path blockage, permission boundaries, repair charge lifecycle, and zero-charge guards. |
+| [`scripts/qaV4_2_1Acceptance.mjs`](scripts/qaV4_2_1Acceptance.mjs) | **New E2E Browser Suite**: 12 end-to-end scenarios covering desktop & mobile viewports, canvas interactions, and console cleanliness. |
 
 ---
 
@@ -255,20 +255,20 @@ Final Verdict: ALL CRITICAL TESTS PASSED ✅
 
 ## 8. Screenshot Artifact Index
 
-All screenshots captured during the acceptance suite have been preserved locally in `screenshots/` and copied to the deliverables archive at `C:\Users\Ahmed\.gemini\antigravity\brain\2be5b84d-78ac-41bf-953a-638f6d09f3be\`:
+All screenshots captured during the acceptance suite have been preserved locally in `screenshots/` and documented below:
 
 | Screenshot Artifact | Description & Verified Behavior |
 | :--- | :--- |
-| [`v4_2_1_01_auto_hold_paused.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_01_auto_hold_paused.png) | Robot cleanly paused at `r: 5, c: 4` displaying `AUTO-HOLD ACTIVE — READY FOR COLLAPSE` |
-| [`v4_2_1_02_auto_hold_rescue_complete.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_02_auto_hold_rescue_complete.png) | Upper northern detour completed: 20 steps, cost 20.0, 1 replan, `RESCUE COMPLETE · DETOUR SUCCESSFUL` |
-| [`v4_2_1_03_moving_collapse_complete.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_03_moving_collapse_complete.png) | Mid-transit moving collapse detour completed with identical 20-step bypass metrics |
-| [`v4_2_1_04_ordinary_wall_immunity.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_04_ordinary_wall_immunity.png) | Demolition click on structural wall rejected with `STRUCTURAL WALL — CANNOT BREACH` and 2 charges intact |
-| [`v4_2_1_05_designated_debris_breached.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_05_designated_debris_breached.png) | Both designated bulkheads cleared, charges decremented 2 -> 1 -> 0, zero-charge guard active |
-| [`v4_2_1_06_challenge_tools_dock_clean.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_06_challenge_tools_dock_clean.png) | Challenge Tools drawer completely stripped of Clear Obstacles, Generate Maze, and drawing tools |
-| [`v4_2_1_07_mobile_repair_counter_390x844.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_07_mobile_repair_counter_390x844.png) | Always-visible floating repair pill `REPAIR ENERGY: 2 / 2` with pip dots on 390×844 mobile viewport |
-| [`v4_2_1_08_mobile_repair_counter_543x589.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_08_mobile_repair_counter_543x589.png) | Persistent mobile repair counter correctly scaled on 543×589 viewport |
-| [`v4_2_1_09_sandbox_lab_unrestricted.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_09_sandbox_lab_unrestricted.png) | Sandbox Lab Tools drawer fully populated with Clear Obstacles, Generate Maze, and Wall tools |
-| [`v4_2_1_10_arena_regression.png`](file:///c:/Users/Ahmed/Downloads/DAA%20project/screenshots/v4_2_1_10_arena_regression.png) | Algorithm Arena verified with BFS Fewest-Step Route and zero console regressions |
+| [`v4_2_1_01_auto_hold_paused.png`](screenshots/v4_2_1_01_auto_hold_paused.png) | Robot cleanly paused at `r: 5, c: 4` displaying `AUTO-HOLD ACTIVE — READY FOR COLLAPSE` |
+| [`v4_2_1_02_auto_hold_rescue_complete.png`](screenshots/v4_2_1_02_auto_hold_rescue_complete.png) | Upper northern detour completed: 20 steps, cost 20.0, 1 replan, `RESCUE COMPLETE · DETOUR SUCCESSFUL` |
+| [`v4_2_1_03_moving_collapse_complete.png`](screenshots/v4_2_1_03_moving_collapse_complete.png) | Mid-transit moving collapse detour completed with identical 20-step bypass metrics |
+| [`v4_2_1_04_ordinary_wall_immunity.png`](screenshots/v4_2_1_04_ordinary_wall_immunity.png) | Demolition click on structural wall rejected with `STRUCTURAL WALL — CANNOT BREACH` and 2 charges intact |
+| [`v4_2_1_05_designated_debris_breached.png`](screenshots/v4_2_1_05_designated_debris_breached.png) | Both designated bulkheads cleared, charges decremented 2 -> 1 -> 0, zero-charge guard active |
+| [`v4_2_1_06_challenge_tools_dock_clean.png`](screenshots/v4_2_1_06_challenge_tools_dock_clean.png) | Challenge Tools drawer completely stripped of Clear Obstacles, Generate Maze, and drawing tools |
+| [`v4_2_1_07_mobile_repair_counter_390x844.png`](screenshots/v4_2_1_07_mobile_repair_counter_390x844.png) | Always-visible floating repair pill `REPAIR ENERGY: 2 / 2` with pip dots on 390×844 mobile viewport |
+| [`v4_2_1_08_mobile_repair_counter_543x589.png`](screenshots/v4_2_1_08_mobile_repair_counter_543x589.png) | Persistent mobile repair counter correctly scaled on 543×589 viewport |
+| [`v4_2_1_09_sandbox_lab_unrestricted.png`](screenshots/v4_2_1_09_sandbox_lab_unrestricted.png) | Sandbox Lab Tools drawer fully populated with Clear Obstacles, Generate Maze, and Wall tools |
+| [`v4_2_1_10_arena_regression.png`](screenshots/v4_2_1_10_arena_regression.png) | Algorithm Arena verified with BFS Fewest-Step Route and zero console regressions |
 
 ---
 

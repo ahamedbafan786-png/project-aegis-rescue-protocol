@@ -15,8 +15,13 @@ async function clickButtonWithText(page, text) {
 }
 
 async function runRegression() {
-  const screenshotsDir = path.resolve('screenshots');
-  const artifactsDir = 'C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be';
+  const screenshotsDir = process.env.SCREENSHOTS_DIR || path.resolve('screenshots');
+  const artifactsDir = process.env.ARTIFACTS_DIR || null;
+  const saveArtifact = (src, name) => {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
+      fs.copyFileSync(src, path.join(artifactsDir, name));
+    }
+  };
 
   if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -134,7 +139,7 @@ async function runRegression() {
 
     const ssP1 = path.join(screenshotsDir, 'v4_1_01_presentation_detour_success.png');
     await page.screenshot({ path: ssP1 });
-    fs.copyFileSync(ssP1, path.join(artifactsDir, 'v4_1_01_presentation_detour_success.png'));
+    saveArtifact(ssP1, 'v4_1_01_presentation_detour_success.png');
 
     // Assertions for Defect 1
     if (triggerBtnText.includes('DETOUR IN PROGRESS')) {
@@ -173,7 +178,7 @@ async function runRegression() {
 
     const ssA1 = path.join(screenshotsDir, 'v4_1_02_arena_weighted_bfs30.png');
     await page.screenshot({ path: ssA1 });
-    fs.copyFileSync(ssA1, path.join(artifactsDir, 'v4_1_02_arena_weighted_bfs30.png'));
+    saveArtifact(ssA1, 'v4_1_02_arena_weighted_bfs30.png');
 
     // Extract metrics from the cards
     const arenaMetrics = await page.evaluate(() => {
@@ -282,7 +287,7 @@ async function runRegression() {
 
     const ssM1 = path.join(screenshotsDir, 'v4_1_03_mobile_390x844_telemetry.png');
     await page.screenshot({ path: ssM1 });
-    fs.copyFileSync(ssM1, path.join(artifactsDir, 'v4_1_03_mobile_390x844_telemetry.png'));
+    saveArtifact(ssM1, 'v4_1_03_mobile_390x844_telemetry.png');
 
     // Toggle Telemetry off: Board must be fully visible again
     await page.click('button[title*="Toggle Telemetry Panel"]');
@@ -314,7 +319,7 @@ async function runRegression() {
 
     const ssM2 = path.join(screenshotsDir, 'v4_1_04_narrow_543x589_exclusive.png');
     await page.screenshot({ path: ssM2 });
-    fs.copyFileSync(ssM2, path.join(artifactsDir, 'v4_1_04_narrow_543x589_exclusive.png'));
+    saveArtifact(ssM2, 'v4_1_04_narrow_543x589_exclusive.png');
 
     // Close Telemetry via X button
     const closeBtns = await page.$$('button');
@@ -343,7 +348,7 @@ async function runRegression() {
     console.error('\n❌ QA REGRESSION ERROR:', err.message);
     const errSs = path.join(screenshotsDir, 'v4_1_regression_error.png');
     await page.screenshot({ path: errSs });
-    fs.copyFileSync(errSs, path.join(artifactsDir, 'v4_1_regression_error.png'));
+    saveArtifact(errSs, 'v4_1_regression_error.png');
     report.push({
       test: 'QA Regression Execution',
       status: 'FAIL',

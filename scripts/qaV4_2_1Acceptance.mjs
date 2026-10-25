@@ -41,8 +41,8 @@ async function getGridClickCoords(page, targetCol, targetRow, totalCols = 21, to
 }
 
 async function runAcceptanceSuite() {
-  const screenshotsDir = path.resolve('screenshots');
-  const artifactsDir = 'C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be';
+  const screenshotsDir = process.env.SCREENSHOTS_DIR || path.resolve('screenshots');
+  const artifactsDir = process.env.ARTIFACTS_DIR || null;
 
   if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -114,7 +114,7 @@ async function runAcceptanceSuite() {
 
     const shot1 = path.join(screenshotsDir, 'v4_2_1_01_auto_hold_paused.png');
     await page.screenshot({ path: shot1 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot1, path.join(artifactsDir, 'v4_2_1_01_auto_hold_paused.png'));
     }
 
@@ -150,10 +150,16 @@ async function runAcceptanceSuite() {
       };
     });
     console.log(`  -> Final Telemetry: Detour Completed: ${rescueComplete}, 1 Replan recorded`);
+    if (!finalTele.has20Steps) {
+      throw new Error('Auto-Hold Detour failed step count assertion: expected 20 steps/cost');
+    }
+    if (!finalTele.has1Replan) {
+      throw new Error('Auto-Hold Detour failed replan count assertion: expected 1 replanning event');
+    }
 
     const shot2 = path.join(screenshotsDir, 'v4_2_1_02_auto_hold_rescue_complete.png');
     await page.screenshot({ path: shot2 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot2, path.join(artifactsDir, 'v4_2_1_02_auto_hold_rescue_complete.png'));
     }
     report.push({ test: 'Scenario 1: Auto-Hold ON -> Trigger Collapse -> Bypass & Complete', pass: true });
@@ -202,9 +208,20 @@ async function runAcceptanceSuite() {
     }
     if (!movingDone) throw new Error('Moving collapse detour did not complete with DETOUR SUCCESSFUL');
 
+    const movingTele = await page.evaluate(() => {
+      const text = document.body.innerText;
+      return {
+        has20Steps: text.includes('20') || text.includes('20.0'),
+        has1Replan: text.includes('1'),
+      };
+    });
+    if (!movingTele.has20Steps || !movingTele.has1Replan) {
+      throw new Error('Moving collapse detour failed telemetry verification for 20 steps/cost and 1 replan');
+    }
+
     const shot3 = path.join(screenshotsDir, 'v4_2_1_03_moving_collapse_complete.png');
     await page.screenshot({ path: shot3 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot3, path.join(artifactsDir, 'v4_2_1_03_moving_collapse_complete.png'));
     }
     report.push({ test: 'Scenario 2: Moving Trigger Collapse (Auto-Hold OFF)', pass: true });
@@ -276,7 +293,7 @@ async function runAcceptanceSuite() {
 
     const shot4 = path.join(screenshotsDir, 'v4_2_1_04_ordinary_wall_immunity.png');
     await page.screenshot({ path: shot4 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot4, path.join(artifactsDir, 'v4_2_1_04_ordinary_wall_immunity.png'));
     }
     report.push({ test: 'Scenario 4: Ordinary Wall Demolition Immunity', pass: true });
@@ -321,10 +338,33 @@ async function runAcceptanceSuite() {
     const zeroChargeFeedback = await page.evaluate(() => document.body.innerText);
     const hasZeroFeedback = zeroChargeFeedback.includes('ZERO REPAIR CHARGES') || zeroChargeFeedback.includes('ALREADY CLEARED');
     console.log(`  -> 0 charge demolition blocked: ${hasZeroFeedback}`);
+    if (!hasZeroFeedback) {
+      throw new Error('Zero charge demolition attempt failed to produce expected rejection feedback');
+    }
+
+    // Attempt demolition on structural wall with 0 charges
+    console.log('  -> Attempting demolition of structural wall with 0 charges...');
+    await page.mouse.click(wallCoord.x, wallCoord.y);
+    await new Promise((r) => setTimeout(r, 300));
+    const wallZeroFeedback = await page.evaluate(() => document.body.innerText);
+    const wallBlockedAtZero = wallZeroFeedback.includes('STRUCTURAL WALL') || wallZeroFeedback.includes('CANNOT BREACH');
+    console.log(`  -> Structural wall blocked at 0 charges: ${wallBlockedAtZero}`);
+    if (!wallBlockedAtZero) {
+      throw new Error('Structural wall breach was not blocked during 0-charge state');
+    }
+
+    // Verify charges remain strictly non-negative (0 / 2)
+    const zeroChargesRemained = await page.evaluate(() => {
+      const text = document.body.innerText;
+      return text.includes('0 CHARGES REMAIN') || text.includes('0 / 2') || text.includes('REPAIR CHARGES: 0');
+    });
+    if (!zeroChargesRemained) {
+      throw new Error('Repair charges did not remain strictly at 0 after failed demolition attempts');
+    }
 
     const shot5 = path.join(screenshotsDir, 'v4_2_1_05_designated_debris_breached.png');
     await page.screenshot({ path: shot5 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot5, path.join(artifactsDir, 'v4_2_1_05_designated_debris_breached.png'));
     }
     report.push({ test: 'Scenario 3 & 6: Designated Debris Demolition & Zero Charge Guard', pass: true });
@@ -356,7 +396,7 @@ async function runAcceptanceSuite() {
 
     const shot6 = path.join(screenshotsDir, 'v4_2_1_06_challenge_tools_dock_clean.png');
     await page.screenshot({ path: shot6 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot6, path.join(artifactsDir, 'v4_2_1_06_challenge_tools_dock_clean.png'));
     }
     report.push({ test: 'Scenario 5: Clear Obstacles & Sandbox Exploits Removed in Challenge Mode', pass: true });
@@ -444,7 +484,7 @@ async function runAcceptanceSuite() {
 
     const shot7 = path.join(screenshotsDir, 'v4_2_1_07_mobile_repair_counter_390x844.png');
     await page.screenshot({ path: shot7 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot7, path.join(artifactsDir, 'v4_2_1_07_mobile_repair_counter_390x844.png'));
     }
 
@@ -460,7 +500,7 @@ async function runAcceptanceSuite() {
 
     const shot8 = path.join(screenshotsDir, 'v4_2_1_08_mobile_repair_counter_543x589.png');
     await page.screenshot({ path: shot8 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot8, path.join(artifactsDir, 'v4_2_1_08_mobile_repair_counter_543x589.png'));
     }
 
@@ -510,7 +550,7 @@ async function runAcceptanceSuite() {
 
     const shot9 = path.join(screenshotsDir, 'v4_2_1_09_sandbox_lab_unrestricted.png');
     await page.screenshot({ path: shot9 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot9, path.join(artifactsDir, 'v4_2_1_09_sandbox_lab_unrestricted.png'));
     }
     report.push({ test: 'Scenario 10: Sandbox Lab Editing Unrestricted', pass: true });
@@ -522,6 +562,10 @@ async function runAcceptanceSuite() {
     await page.click('[data-nav-item="arena"]');
     await new Promise((r) => setTimeout(r, 800));
 
+    // Explicitly select Weighted topology
+    await clickButtonWithText(page, 'weighted');
+    await new Promise((r) => setTimeout(r, 500));
+
     await page.click('[data-tab="bfs"]');
     await new Promise((r) => setTimeout(r, 400));
 
@@ -530,9 +574,30 @@ async function runAcceptanceSuite() {
     console.log(`  -> Algorithm Arena BFS label: ${hasFewestStep}`);
     if (!hasFewestStep) throw new Error('Arena BFS legend missing "Fewest-Step Route"');
 
+    // Verify algorithmic metrics on weighted map
+    const arenaMetrics = await page.evaluate(() => {
+      const bfsCard = document.querySelector('[data-tab="bfs"]');
+      const astarCard = document.querySelector('[data-tab="astar"]');
+      const dijkstraCard = document.querySelector('[data-tab="dijkstra"]');
+      return {
+        bfsText: bfsCard ? bfsCard.innerText : '',
+        astarText: astarCard ? astarCard.innerText : '',
+        dijkstraText: dijkstraCard ? dijkstraCard.innerText : '',
+      };
+    });
+
+    const bfsHas30Cost = arenaMetrics.bfsText.includes('30.0') || arenaMetrics.bfsText.includes('30');
+    const astarHas22Cost = arenaMetrics.astarText.includes('22.0') || arenaMetrics.astarText.includes('22');
+    const dijkstraHas22Cost = arenaMetrics.dijkstraText.includes('22.0') || arenaMetrics.dijkstraText.includes('22');
+
+    console.log(`  -> Arena BFS Cost 30.0: ${bfsHas30Cost}, A* Cost 22.0: ${astarHas22Cost}, Dijkstra Cost 22.0: ${dijkstraHas22Cost}`);
+    if (!bfsHas30Cost || !astarHas22Cost || !dijkstraHas22Cost) {
+      throw new Error(`Weighted Arena cost verification failed: BFS(30.0)=${bfsHas30Cost}, A*(22.0)=${astarHas22Cost}, Dijkstra(22.0)=${dijkstraHas22Cost}`);
+    }
+
     const shot10 = path.join(screenshotsDir, 'v4_2_1_10_arena_regression.png');
     await page.screenshot({ path: shot10 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot10, path.join(artifactsDir, 'v4_2_1_10_arena_regression.png'));
     }
     report.push({ test: 'Scenario 11: Weighted Arena Regression', pass: true });

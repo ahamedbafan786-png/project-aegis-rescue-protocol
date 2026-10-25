@@ -15,8 +15,8 @@ async function clickButtonWithText(page, text) {
 }
 
 async function runAcceptance() {
-  const screenshotsDir = path.resolve('screenshots');
-  const artifactsDir = 'C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be';
+  const screenshotsDir = process.env.SCREENSHOTS_DIR || path.resolve('screenshots');
+  const artifactsDir = process.env.ARTIFACTS_DIR || null;
 
   if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -75,7 +75,7 @@ async function runAcceptance() {
 
     const shot1 = path.join(screenshotsDir, 'v4_2_01_main_menu.png');
     await page.screenshot({ path: shot1 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot1, path.join(artifactsDir, 'v4_2_01_main_menu.png'));
     }
     report.push({ test: 'Main Menu Transformation & Brand Identity', pass: true });
@@ -102,7 +102,7 @@ async function runAcceptance() {
 
     const shot2 = path.join(screenshotsDir, 'v4_2_02_mission_select.png');
     await page.screenshot({ path: shot2 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot2, path.join(artifactsDir, 'v4_2_02_mission_select.png'));
     }
     report.push({ test: 'Tactical Operations Deck & Challenge Missions', pass: true });
@@ -176,7 +176,7 @@ async function runAcceptance() {
 
     const shot3 = path.join(screenshotsDir, 'v4_2_03_corridor_cleared_replan.png');
     await page.screenshot({ path: shot3 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot3, path.join(artifactsDir, 'v4_2_03_corridor_cleared_replan.png'));
     }
 
@@ -201,7 +201,7 @@ async function runAcceptance() {
     await new Promise((r) => setTimeout(r, 1000));
     const shot4 = path.join(screenshotsDir, 'v4_2_04_docking_and_completion.png');
     await page.screenshot({ path: shot4 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot4, path.join(artifactsDir, 'v4_2_04_docking_and_completion.png'));
     }
     report.push({ test: 'Emergency Corridor Control & Rescue Arrival Sequence', pass: true });
@@ -219,7 +219,7 @@ async function runAcceptance() {
 
     const shot5 = path.join(screenshotsDir, 'v4_2_05_canyon_visuals.png');
     await page.screenshot({ path: shot5 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot5, path.join(artifactsDir, 'v4_2_05_canyon_visuals.png'));
     }
 
@@ -231,7 +231,7 @@ async function runAcceptance() {
 
     const shot6 = path.join(screenshotsDir, 'v4_2_06_maze_visuals.png');
     await page.screenshot({ path: shot6 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot6, path.join(artifactsDir, 'v4_2_06_maze_visuals.png'));
     }
     report.push({ test: 'Sector Visual Environments (Amethyst Canyon & Neural Labyrinth)', pass: true });
@@ -257,7 +257,7 @@ async function runAcceptance() {
 
     const shot7 = path.join(screenshotsDir, 'v4_2_07_arena_bfs_label.png');
     await page.screenshot({ path: shot7 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot7, path.join(artifactsDir, 'v4_2_07_arena_bfs_label.png'));
     }
     report.push({ test: 'Algorithm Arena BFS Legend Precision', pass: true });
@@ -285,7 +285,7 @@ async function runAcceptance() {
 
     const shot8 = path.join(screenshotsDir, 'v4_2_08_mobile_390x844.png');
     await page.screenshot({ path: shot8 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot8, path.join(artifactsDir, 'v4_2_08_mobile_390x844.png'));
     }
 
@@ -344,7 +344,7 @@ async function runAcceptance() {
 
     const shot9 = path.join(screenshotsDir, 'v4_2_09_presentation_detour.png');
     await page.screenshot({ path: shot9 });
-    if (fs.existsSync(artifactsDir)) {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
       fs.copyFileSync(shot9, path.join(artifactsDir, 'v4_2_09_presentation_detour.png'));
     }
     report.push({ test: 'Presentation Mode Deterministic Detour', pass: true });

@@ -15,8 +15,13 @@ async function clickButtonWithText(page, text) {
 }
 
 async function runV4Acceptance() {
-  const screenshotsDir = path.resolve('screenshots');
-  const artifactsDir = 'C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be';
+  const screenshotsDir = process.env.SCREENSHOTS_DIR || path.resolve('screenshots');
+  const artifactsDir = process.env.ARTIFACTS_DIR || null;
+  const saveArtifact = (src, name) => {
+    if (artifactsDir && fs.existsSync(artifactsDir)) {
+      fs.copyFileSync(src, path.join(artifactsDir, name));
+    }
+  };
 
   if (!fs.existsSync(screenshotsDir)) {
     fs.mkdirSync(screenshotsDir, { recursive: true });
@@ -50,7 +55,7 @@ async function runV4Acceptance() {
 
     const ssA1 = path.join(screenshotsDir, 'v4_01_main_menu.png');
     await page.screenshot({ path: ssA1 });
-    fs.copyFileSync(ssA1, path.join(artifactsDir, 'v4_01_main_menu.png'));
+    saveArtifact(ssA1, 'v4_01_main_menu.png');
 
     const clickedLaunch = (await clickButtonWithText(page, 'Start Rescue')) || (await clickButtonWithText(page, 'LAUNCH MISSIONS'));
     if (!clickedLaunch) await page.click('[data-nav-item="missions"]');
@@ -58,7 +63,7 @@ async function runV4Acceptance() {
 
     const ssA2 = path.join(screenshotsDir, 'v4_02_mission_select.png');
     await page.screenshot({ path: ssA2 });
-    fs.copyFileSync(ssA2, path.join(artifactsDir, 'v4_02_mission_select.png'));
+    saveArtifact(ssA2, 'v4_02_mission_select.png');
     results.push({ test: 'Test A: Main Menu & Mission Select', status: 'PASS' });
     console.log('✓ Test A Passed');
 
@@ -69,7 +74,7 @@ async function runV4Acceptance() {
 
     const ssB = path.join(screenshotsDir, 'v4_03_mission1_initial.png');
     await page.screenshot({ path: ssB });
-    fs.copyFileSync(ssB, path.join(artifactsDir, 'v4_03_mission1_initial.png'));
+    saveArtifact(ssB, 'v4_03_mission1_initial.png');
 
     // Open Algorithm Analysis Modal
     await clickButtonWithText(page, 'Formula Analysis');
@@ -77,7 +82,7 @@ async function runV4Acceptance() {
 
     const ssB2 = path.join(screenshotsDir, 'v4_03b_analysis_modal.png');
     await page.screenshot({ path: ssB2 });
-    fs.copyFileSync(ssB2, path.join(artifactsDir, 'v4_03b_analysis_modal.png'));
+    saveArtifact(ssB2, 'v4_03b_analysis_modal.png');
 
     // Close Analysis Modal
     await clickButtonWithText(page, 'Resume Mission');
@@ -95,7 +100,7 @@ async function runV4Acceptance() {
 
     const ssC = path.join(screenshotsDir, 'v4_04_robot_transit.png');
     await page.screenshot({ path: ssC });
-    fs.copyFileSync(ssC, path.join(artifactsDir, 'v4_04_robot_transit.png'));
+    saveArtifact(ssC, 'v4_04_robot_transit.png');
     results.push({ test: 'Test C: Robot Transit & Traversal Cost', status: 'PASS' });
     console.log('✓ Test C Passed');
 
@@ -107,7 +112,7 @@ async function runV4Acceptance() {
 
     const ssD = path.join(screenshotsDir, 'v4_05_dynamic_replanning.png');
     await page.screenshot({ path: ssD });
-    fs.copyFileSync(ssD, path.join(artifactsDir, 'v4_05_dynamic_replanning.png'));
+    saveArtifact(ssD, 'v4_05_dynamic_replanning.png');
     results.push({ test: 'Test D: Dynamic Replanning Mid-Transit', status: 'PASS' });
     console.log('✓ Test D Passed');
 
@@ -118,7 +123,7 @@ async function runV4Acceptance() {
 
     const ssE = path.join(screenshotsDir, 'v4_06_mission_results.png');
     await page.screenshot({ path: ssE });
-    fs.copyFileSync(ssE, path.join(artifactsDir, 'v4_06_mission_results.png'));
+    saveArtifact(ssE, 'v4_06_mission_results.png');
     results.push({ test: 'Test E: Mission Completion & Cryo-Pod Arrival', status: 'PASS' });
     console.log('✓ Test E Passed');
 
@@ -156,7 +161,7 @@ async function runV4Acceptance() {
 
     const ssF = path.join(screenshotsDir, 'v4_07_bug1_next_mission_verified.png');
     await page.screenshot({ path: ssF });
-    fs.copyFileSync(ssF, path.join(artifactsDir, 'v4_07_bug1_next_mission_verified.png'));
+    saveArtifact(ssF, 'v4_07_bug1_next_mission_verified.png');
 
     if (!isMaze) {
       throw new Error('Bug 1 Failed: Next Mission did not load The Maze Protocol!');
@@ -182,7 +187,7 @@ async function runV4Acceptance() {
 
     const ssG = path.join(screenshotsDir, 'v4_08_bug2_replay_verified.png');
     await page.screenshot({ path: ssG });
-    fs.copyFileSync(ssG, path.join(artifactsDir, 'v4_08_bug2_replay_verified.png'));
+    saveArtifact(ssG, 'v4_08_bug2_replay_verified.png');
 
     results.push({ test: 'Test G: Bug 2 Fixed (Results Replay Restarts Cleanly)', status: 'PASS' });
     console.log('✓ Test G Passed (Bug 2 Verified Fixed)');
@@ -216,7 +221,7 @@ async function runV4Acceptance() {
 
     const ssH1 = path.join(screenshotsDir, 'v4_09_presentation_543x589_ready.png');
     await page.screenshot({ path: ssH1 });
-    fs.copyFileSync(ssH1, path.join(artifactsDir, 'v4_09_presentation_543x589_ready.png'));
+    saveArtifact(ssH1, 'v4_09_presentation_543x589_ready.png');
 
     // Trigger collapse during demo window
     await clickButtonWithText(page, 'TRIGGER COLLAPSE');
@@ -224,7 +229,7 @@ async function runV4Acceptance() {
 
     const ssH2 = path.join(screenshotsDir, 'v4_10_presentation_543x589_detour.png');
     await page.screenshot({ path: ssH2 });
-    fs.copyFileSync(ssH2, path.join(artifactsDir, 'v4_10_presentation_543x589_detour.png'));
+    saveArtifact(ssH2, 'v4_10_presentation_543x589_detour.png');
 
     results.push({ test: 'Test H: Bug 3 Fixed (Presentation 543x589 No Clipping & Detour)', status: 'PASS' });
     console.log('✓ Test H Passed (Bug 3 Verified Fixed)');
@@ -244,7 +249,7 @@ async function runV4Acceptance() {
     // Capture initial mobile HUD (drawers closed, board visible)
     const ssI1 = path.join(screenshotsDir, 'v4_11_mobile_390x844_hud.png');
     await page.screenshot({ path: ssI1 });
-    fs.copyFileSync(ssI1, path.join(artifactsDir, 'v4_11_mobile_390x844_hud.png'));
+    saveArtifact(ssI1, 'v4_11_mobile_390x844_hud.png');
 
     // Open Tools drawer
     await clickButtonWithText(page, 'Tools');
@@ -256,7 +261,7 @@ async function runV4Acceptance() {
 
     const ssI2 = path.join(screenshotsDir, 'v4_12_mobile_390x844_drawer.png');
     await page.screenshot({ path: ssI2 });
-    fs.copyFileSync(ssI2, path.join(artifactsDir, 'v4_12_mobile_390x844_drawer.png'));
+    saveArtifact(ssI2, 'v4_12_mobile_390x844_drawer.png');
 
     // Click Deploy Robot -> auto-closes drawers
     await clickButtonWithText(page, 'Deploy Robot');
@@ -281,7 +286,7 @@ async function runV4Acceptance() {
 
     const ssJ = path.join(screenshotsDir, 'v4_13_arena_weighted_topology.png');
     await page.screenshot({ path: ssJ });
-    fs.copyFileSync(ssJ, path.join(artifactsDir, 'v4_13_arena_weighted_topology.png'));
+    saveArtifact(ssJ, 'v4_13_arena_weighted_topology.png');
 
     results.push({ test: 'Test J: Algorithm Arena Weighted Topology & Clean Unicode', status: 'PASS' });
     console.log('✓ Test J Passed');

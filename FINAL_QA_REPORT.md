@@ -61,49 +61,49 @@ Measured live via in-page `requestAnimationFrame` metrics across 60 continuous s
 Fresh high-resolution captures produced by our automated browser test runner:
 
 ### 1. Main Menu Screen
-![Main Menu](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_01_main_menu.png)
+![Main Menu](screenshots/qa_01_main_menu.png)
 *Features branded title typography, glowing status badges, and interactive rotating radar sweep showcasing the Aegis-1 character model.*
 
 ---
 
 ### 2. Mission Selection Deck
-![Mission Deck](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_02_mission_deck.png)
+![Mission Deck](screenshots/qa_02_mission_deck.png)
 *Each mission card includes a procedural miniature grid preview illustrating the exact barrier and beacon topography.*
 
 ---
 
 ### 3. Mission 1 Initial State (Game HUD)
-![Mission 1 Initial](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_03_mission1_initial.png)
+![Mission 1 Initial](screenshots/qa_03_mission1_initial.png)
 *Tactical commander console displaying slate grid, beveled 3D walls, glowing cyan A* route, and live $f = g + h$ mathematical breakdown.*
 
 ---
 
 ### 4. Mission 1 Victory Debrief Modal
-![Mission 1 Victory](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_04_mission1_victory.png)
+![Mission 1 Victory](screenshots/qa_04_mission1_victory.png)
 *Rewarded completion dialog with 3-star rating, steps taken, total cost, and confetti particle explosion.*
 
 ---
 
 ### 5. Paused Simulation Mid-Transit
-![Paused State](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_05_paused_state.png)
+![Paused State](screenshots/qa_05_paused_state.png)
 *Demonstrates sub-pixel position lock and directional orientation retention when paused.*
 
 ---
 
 ### 6. Dynamic Replanning Reaction
-![Dynamic Replanning](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_06_dynamic_replanning.png)
+![Dynamic Replanning](screenshots/qa_06_dynamic_replanning.png)
 *Mid-transit blockage detected: Aegis-1 halts safely, triggers the coral alert badge, and redirects along the outer bypass.*
 
 ---
 
 ### 7. Algorithm Arena Benchmark
-![Algorithm Arena](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_07_algorithm_arena.png)
+![Algorithm Arena](screenshots/qa_07_algorithm_arena.png)
 *Direct comparison between A*, Dijkstra, and BFS verifying identical optimal cost while highlighting A*'s search pruning.*
 
 ---
 
 ### 8. Presentation Mode (Auditorium Display)
-![Presentation Mode](/C:/Users/Ahmed/.gemini/antigravity/brain/2be5b84d-78ac-41bf-953a-638f6d09f3be/qa_10_presentation_initial.png)
+![Presentation Mode](screenshots/qa_10_presentation_initial.png)
 *Maximized board view with high-contrast telemetry and 1-click Trigger Blockage button.*
 
 ---

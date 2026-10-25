@@ -46,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Project Aegis
             </span>
             <span className="hidden sm:inline-block text-[10px] bg-[#66DAD5]/15 text-[#66DAD5] px-1.5 py-0.5 rounded font-mono font-semibold border border-[#66DAD5]/30">
-              A* V4.2.1
+              A* V4.2.2
             </span>
           </div>
           <span className="hidden sm:block text-[10px] text-[#A1ADC7] tracking-wider">

@@ -606,31 +606,31 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         <div className="flex items-center gap-2 sm:gap-6 font-mono text-xs">
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Steps</span>
-            <span className="text-xs sm:text-base font-bold text-[#F5F7FF]">{telemetry.stepsTaken}</span>
+            <span data-telemetry="steps" className="text-xs sm:text-base font-bold text-[#F5F7FF]">{telemetry.stepsTaken}</span>
           </div>
 
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Traversed</span>
-            <span className="text-xs sm:text-base font-bold text-[#86E3B4]">
+            <span data-telemetry="traversed" className="text-xs sm:text-base font-bold text-[#86E3B4]">
               {telemetry.executedCost.toFixed(1)}
             </span>
           </div>
 
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Total Cost</span>
-            <span className="text-xs sm:text-base font-bold text-[#66DAD5]">
+            <span data-telemetry="total-cost" className="text-xs sm:text-base font-bold text-[#66DAD5]">
               {telemetry.totalMissionCost.toFixed(1)}
             </span>
           </div>
 
           <div className="text-center">
             <span className="text-[9px] sm:text-[10px] text-[#A1ADC7] block uppercase">Replans</span>
-            <span className="text-xs sm:text-base font-bold text-[#FF9B83]">{telemetry.replans}</span>
+            <span data-telemetry="replans" className="text-xs sm:text-base font-bold text-[#FF9B83]">{telemetry.replans}</span>
           </div>
 
           <div className="hidden md:block text-center">
             <span className="text-[10px] text-[#A1ADC7] block uppercase">Runtime</span>
-            <span className="text-sm font-bold text-[#F5CF79]">{telemetry.runtimeMs.toFixed(2)} ms</span>
+            <span data-telemetry="runtime" className="text-sm font-bold text-[#F5CF79]">{telemetry.runtimeMs.toFixed(2)} ms</span>
           </div>
         </div>
 
