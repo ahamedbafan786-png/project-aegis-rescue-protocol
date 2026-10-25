@@ -368,19 +368,22 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     !hasAutoHeldRef.current;
 
   // Demo window detection: while moving through transit conduit or paused in auto-hold
+  // (Only active if demo blockage has not already occurred pre-deployment)
   const isInDemoWindow =
+    !isDemoBlockagePresent &&
     telemetry.replans === 0 &&
     telemetry.r === 5 &&
     ((robotState === 'MOVING' && telemetry.c >= 3 && telemetry.c <= 8) ||
       (hasAutoHeldRef.current && robotState === 'IDLE'));
 
   const isPastDemoWindow =
+    !isDemoBlockagePresent &&
     telemetry.replans === 0 &&
     telemetry.stepsTaken > 0 &&
     ((telemetry.r === 5 && telemetry.c > 8) || telemetry.r !== 5) &&
     (robotState === 'MOVING' || robotState === 'IDLE');
 
-  const isDetourActive = telemetry.replans > 0;
+  const isDetourActive = telemetry.replans > 0 || (isDemoBlockagePresent && telemetry.stepsTaken > 0);
 
   // Compute status pill display
   let statusBadgeColor = 'bg-[#66DAD5]/20 border-[#66DAD5]/60 text-[#66DAD5]';
@@ -408,7 +411,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
   } else if (isDetourActive && robotState === 'MOVING') {
     statusBadgeColor = 'bg-[#66DAD5]/25 border-[#66DAD5] text-[#66DAD5]';
     statusBadgeDot = 'bg-[#66DAD5] animate-ping';
-    displayStatus = 'DYNAMIC REPLAN: A* DETOUR VIA BYPASS';
+    displayStatus = telemetry.replans > 0
+      ? 'DYNAMIC REPLAN: A* DETOUR VIA BYPASS'
+      : 'NAVIGATING BYPASS · DETOUR ACTIVE';
   } else if (robotState === 'BLOCKED' || robotState === 'REPLANNING') {
     statusBadgeColor = 'bg-[#FF9B83]/25 border-[#FF9B83]/80 text-[#FF9B83] animate-pulse';
     statusBadgeDot = 'bg-[#FF9B83]';
@@ -474,10 +479,13 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         <span>TRIGGER COLLAPSE NOW</span>
       </>
     );
-  } else if (isDetourActive && robotState === 'MOVING') {
+  } else if (isDetourActive && (robotState === 'MOVING' || (robotState === 'IDLE' && telemetry.stepsTaken > 0))) {
     triggerButtonDisabled = true;
     triggerButtonClass = 'bg-[#86E3B4]/20 border-[#86E3B4]/60 text-[#86E3B4] cursor-default';
-    triggerButtonTitle = 'A* has successfully replanned around the collapse!';
+    triggerButtonTitle =
+      telemetry.replans > 0
+        ? 'A* has successfully replanned around the collapse!'
+        : 'Aegis-1 is navigating the planned bypass route around the collapse at (5, 10).';
     triggerButtonContent = (
       <>
         <Sparkles className="w-4 h-4 text-[#86E3B4]" />

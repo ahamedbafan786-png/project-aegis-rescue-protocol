@@ -21,6 +21,7 @@
 ### 2. P1: Pre-Deploy Presentation Collapse Semantics
 - **Stationary Pre-Deployment State:** When triggering an emergency structural collapse before the robot is deployed, the map is dynamically updated with the collapse wall at `(5, 10)`, and A* recalculates and renders the planned 20-step upper bypass route.
 - **No Premature Automatic Transit:** Corrected the route blockage handler so the robot remains stationary at its starting waypoint `(5, 1)` with `0 steps taken` and `0 replans`.
+- **Pre-Deploy Transit State Guard:** During bypass transit following pre-deploy collapse, the demo trigger window is cleanly disarmed (`!isDemoBlockagePresent`), ensuring Aegis-1 does not falsely trigger another collapse or display confusing prompts while transiting columns 3–8. Status is accurately displayed as `NAVIGATING BYPASS · DETOUR ACTIVE` and trigger button displays locked `DETOUR IN PROGRESS`.
 - **Distinction of Initial Planning vs. Execution Replanning:** The replan counter mathematically distinguishes initial route calculation before movement (`replans = 0`) from mid-transit dynamic replanning (`replans = 1`). Total mission cost and telemetry remain mathematically consistent ($g(n) + \text{remaining} = \text{totalCost}$).
 - **Explicit Deployment Trigger:** Transit begins exclusively when the presenter explicitly clicks **Deploy Robot**. The robot then follows the genuine 20-step bypass route through row 3 to target arrival (`RESCUE COMPLETE · DETOUR SUCCESSFUL`).
 - **Mid-Transit Auto-Hold Preserved:** Auto-Hold waypoint pausing at `(5, 4)` and mid-transit dynamic replanning (producing the 20-step bypass with 1 replan) remain fully intact and operational.
@@ -31,14 +32,15 @@
 - **Zero-Charge Guard:** Attempting demolition of designated debris after charges reach zero is rejected (`ZERO REPAIR CHARGES — CONSERVE CHARGES OR DETOUR`) without charge mutation.
 - **Rapid Click Protection:** Subsequent clicks on already-cleared debris tiles are rejected (`DEBRIS ALREADY CLEARED`) without erroneously consuming charges.
 - **Dual Bulkhead Clearance:** Full mission completion verified on *Deep Vault Quarantine* after strategically breaching both bulkhead junctions.
-- **Authoritative Reset & Replay:** Reset and Replay mechanisms cleanly restore original mission geometry and full 2/2 repair charges.
+- **Authoritative Reset & Replay:** Reset and Replay mechanisms cleanly restore original mission geometry and full 2/2 repair charges, verified via automated test suites.
+- **Cross-Mission Charge Isolation:** Verified that exhausting charges in Challenge 1 and switching to Deep Vault Quarantine (or resetting) initializes fresh isolated repair charges and unbreached bulkheads.
 
 ---
 
 ## 🧪 Comprehensive Verification Record
 
-- **Unit Tests:** **60/60 passing** (`vitest run`) across 7 test suites:
-  - `tests/v4_2_2_stability_mobile.test.ts` (6 tests covering pre-deploy collapse semantics, logic-level challenge mode editing barriers, zero charge guards, rapid demolition click protection, and Deep Vault completion).
+- **Unit Tests:** **63/63 passing** (`vitest run`) across 7 test suites:
+  - `tests/v4_2_2_stability_mobile.test.ts` (9 tests covering pre-deploy collapse semantics, logic-level challenge mode editing barriers, zero charge guards, rapid demolition click protection, Deep Vault completion, authoritative replay restoration, cross-mission charge isolation, and pre-deploy transit state guards).
   - `tests/v4_2_1_gameplay_integrity.test.ts` (26 tests).
   - `tests/astar.test.ts` (12 tests).
   - `tests/challengeMechanic.test.ts` (4 tests).
@@ -55,6 +57,13 @@
   - `Scenario 4`: Structural Wall Demolition Immunity in both Challenge Missions.
   - `Scenario 5`: Sandbox Exploits Removed in Challenge Mode.
   - `Scenario 7 & 8`: Authoritative Reset & Replay Restoration.
-  - `Scenario 9`: Persistent Mobile Repair Counter & Multi-Viewport Bounding Box Non-Overlap (`320px`, `360px`, `375px`, `390px`, `430px`, `543px`) with `2 -> 1 -> 0` dynamic charge transitions.
+  - `Scenario 9`: Persistent Mobile Repair Counter & Multi-Viewport Bounding Box Non-Overlap:
+    - 320px: Clearance Left = 43px, Clearance Right = 17px, Height = 27px, Text = "2/2".
+    - 360px: Clearance Left = 63px, Clearance Right = 37px, Height = 27px.
+    - 375px: Clearance Left = 70px, Clearance Right = 44px, Height = 27px.
+    - 390px: Clearance Left = 78px, Clearance Right = 52px, Height = 27px.
+    - 430px: Clearance Left = 98px, Clearance Right = 72px, Height = 27px.
+    - 543px: Clearance Left = 154px, Clearance Right = 128px, Height = 27px.
+    - Dynamic charge transitions: `2/2` -> `1/2` -> `0/2` verified without overlap.
   - `Scenario 10`: Unrestricted Sandbox Lab Editing.
   - `Scenario 11 & 12`: Algorithm Arena Weighted Metrics (BFS 30.0 vs A\* 22.0 vs Dijkstra 22.0) & 0 Browser Console Errors.

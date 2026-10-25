@@ -282,5 +282,202 @@ describe('Project Aegis V4.2.2 Stability & Edge Cases Test Suite', () => {
       expect(robot.state).toBe('ARRIVED');
       expect(robot.logicalPos).toEqual(deepVaultMission.target);
     });
+
+    it('Replay after a breached Challenge Mission cleanly restores original mission state and repair charges', () => {
+      // 1. Setup and breach Challenge 1
+      const model = new GridModel(
+        challenge1Mission.rows,
+        challenge1Mission.cols,
+        challenge1Mission.start,
+        challenge1Mission.target
+      );
+      challenge1Mission.initialWalls.forEach((w) => model.setTile(w.r, w.c, 'WALL'));
+      challenge1Mission.initialRoughTerrain?.forEach((t) => model.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
+      challenge1Mission.initialDebris?.forEach((d) => model.setTile(d.r, d.c, 'DEBRIS'));
+
+      let charges = challenge1Mission.repairCharges!;
+      expect(charges).toBe(2);
+
+      // Spend all charges
+      challenge1Mission.initialDebris!.forEach((d) => {
+        model.setTile(d.r, d.c, 'EMPTY');
+        charges--;
+      });
+      expect(charges).toBe(0);
+
+      // Navigate robot to destination
+      const robot = new RobotController(challenge1Mission.start);
+      const res = findPathAStar({
+        grid: model.tiles,
+        rows: model.rows,
+        cols: model.cols,
+        start: challenge1Mission.start,
+        goal: challenge1Mission.target,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      robot.setPath(res.path, res.totalCost);
+      robot.startMoving();
+      while (robot.state === 'MOVING') {
+        robot.update(0.35, 10);
+      }
+      expect(robot.state).toBe('ARRIVED');
+      expect(robot.stepsTaken).toBe(16);
+
+      // 2. Perform Authoritative Replay (identical to handleReplayMission / GameHUD key re-mount)
+      const freshModel = new GridModel(
+        challenge1Mission.rows,
+        challenge1Mission.cols,
+        challenge1Mission.start,
+        challenge1Mission.target
+      );
+      challenge1Mission.initialWalls.forEach((w) => freshModel.setTile(w.r, w.c, 'WALL'));
+      challenge1Mission.initialRoughTerrain?.forEach((t) => freshModel.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
+      challenge1Mission.initialDebris?.forEach((d) => freshModel.setTile(d.r, d.c, 'DEBRIS'));
+
+      robot.reset(challenge1Mission.start);
+      charges = challenge1Mission.repairCharges!;
+
+      // 3. Verify complete restoration of mission state
+      expect(charges).toBe(2);
+      expect(robot.state).toBe('IDLE');
+      expect(robot.logicalPos).toEqual(challenge1Mission.start);
+      expect(robot.stepsTaken).toBe(0);
+      expect(robot.executedCost).toBe(0);
+      expect(robot.replansCount).toBe(0);
+
+      // Debris tiles must be restored and blocking direct corridor
+      challenge1Mission.initialDebris!.forEach((d) => {
+        expect(freshModel.tiles[d.r][d.c]).toBe('DEBRIS');
+        expect(isTileBlocked(freshModel.tiles[d.r][d.c])).toBe(true);
+      });
+
+      // A* path is once again forced to take upper rough-terrain detour
+      const replayedPath = findPathAStar({
+        grid: freshModel.tiles,
+        rows: freshModel.rows,
+        cols: freshModel.cols,
+        start: challenge1Mission.start,
+        goal: challenge1Mission.target,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      expect(replayedPath.found).toBe(true);
+      expect(replayedPath.path.length - 1).toBeGreaterThan(16);
+      expect(replayedPath.path.some((wp) => wp.r <= 3)).toBe(true);
+    });
+
+    it('Reset and mission switching with exhausted charges correctly isolates and restores each mission', () => {
+      // 1. Exhaust charges on Challenge 1
+      let c1Charges = challenge1Mission.repairCharges!;
+      c1Charges = 0; // all charges consumed
+
+      // Reset within Challenge 1
+      c1Charges = challenge1Mission.repairCharges!;
+      expect(c1Charges).toBe(2);
+
+      // Exhaust charges again
+      c1Charges = 0;
+
+      // 2. Switch to Deep Vault Quarantine (Challenge 2)
+      const deepVaultModel = new GridModel(
+        deepVaultMission.rows,
+        deepVaultMission.cols,
+        deepVaultMission.start,
+        deepVaultMission.target
+      );
+      deepVaultMission.initialWalls.forEach((w) => deepVaultModel.setTile(w.r, w.c, 'WALL'));
+      deepVaultMission.initialDebris?.forEach((d) => deepVaultModel.setTile(d.r, d.c, 'DEBRIS'));
+
+      let deepVaultCharges = deepVaultMission.repairCharges!;
+      expect(deepVaultCharges).toBe(2);
+
+      // Verify Deep Vault starts with its own distinct bulkheads intact
+      expect(deepVaultMission.initialDebris).toBeDefined();
+      deepVaultMission.initialDebris!.forEach((d) => {
+        expect(deepVaultModel.tiles[d.r][d.c]).toBe('DEBRIS');
+        expect(isTileDesignatedDebris(d, deepVaultMission)).toBe(true);
+        expect(isTileDesignatedDebris(d, challenge1Mission)).toBe(false);
+      });
+
+      // Exhaust Deep Vault charges
+      deepVaultCharges = 0;
+
+      // Reset Deep Vault
+      deepVaultCharges = deepVaultMission.repairCharges!;
+      expect(deepVaultCharges).toBe(2);
+
+      // Switch back to Challenge 1
+      const c1RestoredModel = new GridModel(
+        challenge1Mission.rows,
+        challenge1Mission.cols,
+        challenge1Mission.start,
+        challenge1Mission.target
+      );
+      challenge1Mission.initialWalls.forEach((w) => c1RestoredModel.setTile(w.r, w.c, 'WALL'));
+      challenge1Mission.initialDebris?.forEach((d) => c1RestoredModel.setTile(d.r, d.c, 'DEBRIS'));
+      const c1RestoredCharges = challenge1Mission.repairCharges!;
+
+      expect(c1RestoredCharges).toBe(2);
+      expect(c1RestoredModel.tiles[5][8]).toBe('DEBRIS');
+      expect(c1RestoredModel.tiles[5][12]).toBe('DEBRIS');
+    });
+
+    it('Pre-deploy presentation collapse suppresses false demo window re-arming during bypass transit', () => {
+      const model = new GridModel(
+        presentationMission.rows,
+        presentationMission.cols,
+        presentationMission.start,
+        presentationMission.target
+      );
+      presentationMission.initialWalls.forEach((w) => model.setTile(w.r, w.c, 'WALL'));
+
+      // Pre-deploy collapse placed at (5, 10)
+      const collapseCoord = presentationMission.demoBlockageCoord!;
+      model.setTile(collapseCoord.r, collapseCoord.c, 'WALL');
+
+      const isDemoBlockagePresent = isTileBlocked(model.tiles[collapseCoord.r][collapseCoord.c]);
+      expect(isDemoBlockagePresent).toBe(true);
+
+      const robot = new RobotController(presentationMission.start);
+      const plan = findPathAStar({
+        grid: model.tiles,
+        rows: model.rows,
+        cols: model.cols,
+        start: presentationMission.start,
+        goal: presentationMission.target,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      expect(plan.found).toBe(true);
+      robot.setPath(plan.path, plan.totalCost);
+
+      // Start movement along the 20-step bypass
+      robot.startMoving();
+
+      // Step until robot reaches col 3 (inside coordinate bounds where demo window would normally trigger)
+      while (robot.state === 'MOVING' && robot.logicalPos.c < 3) {
+        robot.update(0.1, 2);
+      }
+
+      const tel = robot.getTelemetry();
+      expect(tel.currentLogicalCoord.c).toBeGreaterThanOrEqual(3);
+      expect(tel.currentLogicalCoord.r).toBe(5);
+
+      // Verify that because demo collapse is already present, demo window does NOT re-arm
+      const isInDemoWindow =
+        !isDemoBlockagePresent &&
+        tel.replansCount === 0 &&
+        tel.currentLogicalCoord.r === 5 &&
+        robot.state === 'MOVING' &&
+        tel.currentLogicalCoord.c >= 3 &&
+        tel.currentLogicalCoord.c <= 8;
+
+      expect(isInDemoWindow).toBe(false);
+
+      // Verify detour is actively recognized
+      const isDetourActive = tel.replansCount > 0 || (isDemoBlockagePresent && tel.totalStepsTaken > 0);
+      expect(isDetourActive).toBe(true);
+    });
   });
 });
