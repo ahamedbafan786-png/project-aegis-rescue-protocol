@@ -140,21 +140,26 @@ async function runAcceptanceSuite() {
 
     if (!rescueComplete) throw new Error('Rescue did not complete with DETOUR SUCCESSFUL');
 
-    // Inspect final telemetry
+    // Inspect final telemetry with scoped exact selectors
     const finalTele = await page.evaluate(() => {
-      const text = document.body.innerText;
+      const stepsEl = document.querySelector('[data-telemetry="steps"]');
+      const replansEl = document.querySelector('[data-telemetry="replans"]');
+      const costEl = document.querySelector('[data-telemetry="total-cost"]');
       return {
-        has20Steps: text.includes('20') || text.includes('20.0'),
-        has1Replan: text.includes('1'),
-        fullText: text,
+        steps: stepsEl ? parseInt(stepsEl.innerText.trim(), 10) : NaN,
+        replans: replansEl ? parseInt(replansEl.innerText.trim(), 10) : NaN,
+        cost: costEl ? parseFloat(costEl.innerText.trim()) : NaN,
       };
     });
-    console.log(`  -> Final Telemetry: Detour Completed: ${rescueComplete}, 1 Replan recorded`);
-    if (!finalTele.has20Steps) {
-      throw new Error('Auto-Hold Detour failed step count assertion: expected 20 steps/cost');
+    console.log(`  -> Final Telemetry: Detour Completed: ${rescueComplete}, Steps: ${finalTele.steps}, Replans: ${finalTele.replans}, Cost: ${finalTele.cost}`);
+    if (finalTele.steps !== 20) {
+      throw new Error(`Auto-Hold Detour failed step count assertion: expected 20, got ${finalTele.steps}`);
     }
-    if (!finalTele.has1Replan) {
-      throw new Error('Auto-Hold Detour failed replan count assertion: expected 1 replanning event');
+    if (finalTele.replans !== 1) {
+      throw new Error(`Auto-Hold Detour failed replan count assertion: expected 1, got ${finalTele.replans}`);
+    }
+    if (Math.abs(finalTele.cost - 20.0) > 0.01) {
+      throw new Error(`Auto-Hold Detour failed cost assertion: expected 20.0, got ${finalTele.cost}`);
     }
 
     const shot2 = path.join(screenshotsDir, 'v4_2_1_02_auto_hold_rescue_complete.png');
@@ -209,14 +214,17 @@ async function runAcceptanceSuite() {
     if (!movingDone) throw new Error('Moving collapse detour did not complete with DETOUR SUCCESSFUL');
 
     const movingTele = await page.evaluate(() => {
-      const text = document.body.innerText;
+      const stepsEl = document.querySelector('[data-telemetry="steps"]');
+      const replansEl = document.querySelector('[data-telemetry="replans"]');
+      const costEl = document.querySelector('[data-telemetry="total-cost"]');
       return {
-        has20Steps: text.includes('20') || text.includes('20.0'),
-        has1Replan: text.includes('1'),
+        steps: stepsEl ? parseInt(stepsEl.innerText.trim(), 10) : NaN,
+        replans: replansEl ? parseInt(replansEl.innerText.trim(), 10) : NaN,
+        cost: costEl ? parseFloat(costEl.innerText.trim()) : NaN,
       };
     });
-    if (!movingTele.has20Steps || !movingTele.has1Replan) {
-      throw new Error('Moving collapse detour failed telemetry verification for 20 steps/cost and 1 replan');
+    if (movingTele.steps !== 20 || movingTele.replans !== 1 || Math.abs(movingTele.cost - 20.0) > 0.01) {
+      throw new Error(`Moving collapse detour failed telemetry: expected steps=20, replans=1, cost=20.0, got steps=${movingTele.steps}, replans=${movingTele.replans}, cost=${movingTele.cost}`);
     }
 
     const shot3 = path.join(screenshotsDir, 'v4_2_1_03_moving_collapse_complete.png');
@@ -516,15 +524,40 @@ async function runAcceptanceSuite() {
         const toolsRect = toolsBtn.getBoundingClientRect();
         const telRect = telBtn.getBoundingClientRect();
 
+        const style = window.getComputedStyle(counterEl);
+        const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+        const hasNonZeroSize = counterRect.width > 0 && counterRect.height > 0;
+
+        // Exact 2D bounding box intersection check
+        const intersects = (r1, r2) => !(
+          r1.right <= r2.left ||
+          r1.left >= r2.right ||
+          r1.bottom <= r2.top ||
+          r1.top >= r2.bottom
+        );
+
+        const overlapsTools = intersects(counterRect, toolsRect);
+        const overlapsTel = intersects(counterRect, telRect);
+        const noOverlap = !overlapsTools && !overlapsTel;
+
+        // Check that element is not clipped outside the viewport bounds
+        const isClipped = counterRect.left < 0 || counterRect.right > width || counterRect.top < 0 || counterRect.bottom > 800;
+
         const clearanceLeft = counterRect.left - toolsRect.right;
         const clearanceRight = telRect.left - counterRect.right;
-        const noOverlap = clearanceLeft >= 0 && clearanceRight >= 0;
         const isSingleLine = counterRect.height <= 40; // No vertical multi-line wrap
         const text = counterEl.innerText || counterEl.textContent || '';
         const hasCounterText = text.includes('2/2') || text.includes('2 / 2');
 
+        const ok = isVisible && hasNonZeroSize && !isClipped && noOverlap && isSingleLine && hasCounterText;
+
         return {
-          ok: noOverlap && isSingleLine && hasCounterText,
+          ok,
+          isVisible,
+          hasNonZeroSize,
+          isClipped,
+          overlapsTools,
+          overlapsTel,
           width,
           clearanceLeft: Math.round(clearanceLeft),
           clearanceRight: Math.round(clearanceRight),
@@ -682,25 +715,35 @@ async function runAcceptanceSuite() {
     console.log(`  -> Algorithm Arena BFS label: ${hasFewestStep}`);
     if (!hasFewestStep) throw new Error('Arena BFS legend missing "Fewest-Step Route"');
 
-    // Verify algorithmic metrics on weighted map
+    // Verify algorithmic metrics on weighted map using exact scoped data-metric selectors
     const arenaMetrics = await page.evaluate(() => {
-      const bfsCard = document.querySelector('[data-tab="bfs"]');
-      const astarCard = document.querySelector('[data-tab="astar"]');
-      const dijkstraCard = document.querySelector('[data-tab="dijkstra"]');
+      const getCard = (tab) => {
+        const card = document.querySelector(`[data-tab="${tab}"]`);
+        if (!card) return { steps: NaN, cost: NaN };
+        const stepsEl = card.querySelector('[data-metric="steps"]');
+        const costEl = card.querySelector('[data-metric="cost"]');
+        return {
+          steps: stepsEl ? parseInt(stepsEl.innerText.trim(), 10) : NaN,
+          cost: costEl ? parseFloat(costEl.innerText.trim()) : NaN,
+        };
+      };
       return {
-        bfsText: bfsCard ? bfsCard.innerText : '',
-        astarText: astarCard ? astarCard.innerText : '',
-        dijkstraText: dijkstraCard ? dijkstraCard.innerText : '',
+        bfs: getCard('bfs'),
+        astar: getCard('astar'),
+        dijkstra: getCard('dijkstra'),
       };
     });
 
-    const bfsHas30Cost = arenaMetrics.bfsText.includes('30.0') || arenaMetrics.bfsText.includes('30');
-    const astarHas22Cost = arenaMetrics.astarText.includes('22.0') || arenaMetrics.astarText.includes('22');
-    const dijkstraHas22Cost = arenaMetrics.dijkstraText.includes('22.0') || arenaMetrics.dijkstraText.includes('22');
+    console.log(`  -> Arena Scoped Metrics: BFS(cost=${arenaMetrics.bfs.cost}, steps=${arenaMetrics.bfs.steps}), A*(cost=${arenaMetrics.astar.cost}, steps=${arenaMetrics.astar.steps}), Dijkstra(cost=${arenaMetrics.dijkstra.cost}, steps=${arenaMetrics.dijkstra.steps})`);
 
-    console.log(`  -> Arena BFS Cost 30.0: ${bfsHas30Cost}, A* Cost 22.0: ${astarHas22Cost}, Dijkstra Cost 22.0: ${dijkstraHas22Cost}`);
-    if (!bfsHas30Cost || !astarHas22Cost || !dijkstraHas22Cost) {
-      throw new Error(`Weighted Arena cost verification failed: BFS(30.0)=${bfsHas30Cost}, A*(22.0)=${astarHas22Cost}, Dijkstra(22.0)=${dijkstraHas22Cost}`);
+    if (Math.abs(arenaMetrics.bfs.cost - 30.0) > 0.01) {
+      throw new Error(`Weighted Arena BFS cost mismatch: expected 30.0, got ${arenaMetrics.bfs.cost}`);
+    }
+    if (Math.abs(arenaMetrics.astar.cost - 22.0) > 0.01) {
+      throw new Error(`Weighted Arena A* cost mismatch: expected 22.0, got ${arenaMetrics.astar.cost}`);
+    }
+    if (Math.abs(arenaMetrics.dijkstra.cost - 22.0) > 0.01) {
+      throw new Error(`Weighted Arena Dijkstra cost mismatch: expected 22.0, got ${arenaMetrics.dijkstra.cost}`);
     }
 
     const shot10 = path.join(screenshotsDir, 'v4_2_1_10_arena_regression.png');

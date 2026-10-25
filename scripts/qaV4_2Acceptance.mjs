@@ -1,3 +1,7 @@
+/**
+ * HISTORICAL QA SUITE — V4.2 ARCHIVE
+ * Retained for regression provenance. Current authoritative suite is scripts/qaV4_2_2Acceptance.mjs.
+ */
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';

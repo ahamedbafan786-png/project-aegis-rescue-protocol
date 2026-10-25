@@ -35,7 +35,7 @@ All screenshots below are captured from live production runs of the application.
 ![Main Menu](screenshots/v4_2_01_main_menu.png)
 
 ### 2. Actual Gameplay & Disaster Environments
-*Tactical grid view featuring high-contrast terrain rendering, rough crystalline fields ($3\times$ cost), and ambient occlusion.*
+*Tactical grid view featuring high-contrast terrain rendering, rough crystalline fields (3× movement cost), and ambient occlusion.*
 ![Actual Gameplay](screenshots/v4_2_05_canyon_visuals.png)
 
 ### 3. Rescue Robot Navigation
@@ -85,12 +85,12 @@ All screenshots below are captured from live production runs of the application.
 | Layer | Technology | Details |
 | :--- | :--- | :--- |
 | **Framework** | [React 19.3](https://react.dev/) | Modern functional components, strict hooks, zero legacy patterns |
-| **Language** | [TypeScript 5.8](https://www.typescriptlang.org/) | Strict mode enabled, comprehensive interfaces for grid models and telemetry |
+| **Language** | [TypeScript 6.0](https://www.typescriptlang.org/) | Strict mode enabled, comprehensive interfaces for grid models and telemetry |
 | **Bundler & Tooling** | [Vite 8.3](https://vitejs.dev/) | Lightning-fast HMR and optimized production bundling |
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) | Modern utility-first CSS engine with custom color palettes |
 | **Graphics Engine** | HTML5 Canvas 2D | Custom render pipeline with delta-time animation loop and particle physics |
 | **Audio** | Web Audio API | Procedural waveform synthesis (sine, square, sawtooth) with gain nodes |
-| **Unit Testing** | [Vitest 5.0](https://vitest.dev/) | 54 automated tests verifying admissibility, min-heap properties, and replanning |
+| **Unit Testing** | [Vitest 5.0](https://vitest.dev/) | 63 automated tests verifying admissibility, min-heap properties, and replanning |
 | **Browser QA** | [Puppeteer](https://pptr.dev/) | End-to-end automated screenshot verification across viewport sizes |
 | **Hosting** | [Vercel](https://vercel.com/) | Continuous deployment with global edge CDN delivery |
 
@@ -148,7 +148,7 @@ Both A* and Dijkstra naturally discover that routing through up to 2 empty floor
 ## Installation and Running Locally
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) v22.12.0 or higher (LTS recommended)
+- [Node.js](https://nodejs.org/) `^22.12.0 || ^24.0.0 || >=26.0.0` (Recommended: Node.js 22 LTS; tested on v22.12+)
 - `npm` v10.0.0 or higher
 
 ### 1. Clone the Repository
@@ -246,13 +246,14 @@ project-aegis-rescue-protocol/
 │   ├── App.tsx              # Application root state & screen routing
 │   ├── index.css            # Tailwind CSS styling & custom effects
 │   └── main.tsx             # Application DOM mounting point
-├── tests/                   # Automated Vitest test suites (54 unit tests)
+├── tests/                   # Automated Vitest test suites (63 unit tests across 7 suites)
 │   ├── astar.test.ts
 │   ├── challengeMechanic.test.ts
 │   ├── heuristics.test.ts
 │   ├── minHeap.test.ts
 │   ├── robotCostAccounting.test.ts
-│   └── v4_2_1_gameplay_integrity.test.ts
+│   ├── v4_2_1_gameplay_integrity.test.ts
+│   └── v4_2_2_stability_mobile.test.ts
 ├── screenshots/             # High-resolution gameplay captures
 ├── scripts/                 # Puppeteer automated browser QA suites
 ├── DEMO_GUIDE.md            # Live viva presentation script & defense cheat sheet
@@ -282,7 +283,7 @@ Project Aegis was designed as an interactive academic demonstration for courses 
 The following features are planned for future releases:
 
 - [ ] **Jump Point Search (JPS)**: Path acceleration algorithm for uniform grid maps to bypass symmetric paths.
-- [ ] **Hierarchical Pathfinding (HPA\*)**: Multi-level sector abstraction for massive disaster maps ($100 \times 100+$).
+- [ ] **Hierarchical Pathfinding (HPA\*)**: Multi-level sector abstraction for massive disaster maps (100×100+).
 - [ ] **Multi-Agent Coordination**: Simultaneous deployment of Aegis-1, Aegis-2, and Aegis-3 with conflict-based collision avoidance (CBS).
 - [ ] **Dynamic Environmental Hazards**: Expanding toxic gas plumes and spreading fires with time-decaying traversal costs.
 - [ ] **Custom Level Export & Import**: Save and share custom disaster topographies in JSON format.

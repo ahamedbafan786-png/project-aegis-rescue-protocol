@@ -321,13 +321,13 @@ export const AlgorithmArena: React.FC = () => {
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
                 <span className="text-[#A1ADC7]">Movement Steps:</span>
-                <span className="font-mono font-bold text-[#6FAFFF]">
+                <span data-metric="steps" className="font-mono font-bold text-[#6FAFFF]">
                   {Math.max(0, (results.astar?.path.length ?? 1) - 1)} steps
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
                 <span className="text-[#A1ADC7]">Route Cost:</span>
-                <span className="font-mono font-bold text-[#86E3B4]">
+                <span data-metric="cost" className="font-mono font-bold text-[#86E3B4]">
                   {results.astar?.totalCost.toFixed(1) ?? '0.0'}
                 </span>
               </div>
@@ -373,13 +373,13 @@ export const AlgorithmArena: React.FC = () => {
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
                 <span className="text-[#A1ADC7]">Movement Steps:</span>
-                <span className="font-mono font-bold text-[#6FAFFF]">
+                <span data-metric="steps" className="font-mono font-bold text-[#6FAFFF]">
                   {Math.max(0, (results.dijkstra?.path.length ?? 1) - 1)} steps
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
                 <span className="text-[#A1ADC7]">Route Cost:</span>
-                <span className="font-mono font-bold text-[#86E3B4]">
+                <span data-metric="cost" className="font-mono font-bold text-[#86E3B4]">
                   {results.dijkstra?.totalCost.toFixed(1) ?? '0.0'}
                 </span>
               </div>
@@ -425,13 +425,13 @@ export const AlgorithmArena: React.FC = () => {
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
                 <span className="text-[#A1ADC7]">Movement Steps:</span>
-                <span className="font-mono font-bold text-[#6FAFFF]">
+                <span data-metric="steps" className="font-mono font-bold text-[#6FAFFF]">
                   {Math.max(0, (results.bfs?.path.length ?? 1) - 1)} steps
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-[#2B3B5B]/60">
                 <span className="text-[#A1ADC7]">Route Cost:</span>
-                <span className="font-mono font-bold text-[#86E3B4]">
+                <span data-metric="cost" className="font-mono font-bold text-[#86E3B4]">
                   {results.bfs?.totalCost.toFixed(1) ?? '0.0'}
                 </span>
               </div>

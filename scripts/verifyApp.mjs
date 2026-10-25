@@ -1,3 +1,7 @@
+/**
+ * LEGACY SMOKE CHECK — HISTORICAL SCREENSHOT UTILITY
+ * Note: Excluded from modern release-quality assertions. Use scripts/qaV4_2_2Acceptance.mjs.
+ */
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
@@ -123,9 +127,16 @@ async function runVerification() {
     }
   } catch (err) {
     console.error('Verification encountered an error:', err);
+    process.exit(1);
   } finally {
     await browser.close();
   }
+
+  if (consoleErrors.length > 0) {
+    console.error(`Verification failed with ${consoleErrors.length} console errors:`, consoleErrors);
+    process.exit(1);
+  }
+  process.exit(0);
 }
 
 runVerification();

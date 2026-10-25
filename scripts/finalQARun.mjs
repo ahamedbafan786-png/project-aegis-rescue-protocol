@@ -1,3 +1,8 @@
+/**
+ * LEGACY ACCEPTANCE RUNNER — V2/V3 ARCHIVE
+ * Historical acceptance test script.
+ * Note: Current authoritative acceptance for release readiness is scripts/qaV4_2_2Acceptance.mjs.
+ */
 import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
@@ -149,14 +154,41 @@ async function runFinalQA() {
     console.log('\n[TEST 7] Testing Enclosed Unreachable Destination Handling...');
     await clickButtonWithText(page, 'Reset');
     await new Promise((r) => setTimeout(r, 400));
-    // Click Clear, then enclose target or wall off
-    // We verify through the algorithm directly that unreachable returns found: false without throw
+    // Authoritatively construct a walled-off, unreachable goal and verify A* returns found: false
     const unreachableTest = await page.evaluate(() => {
-      // Intentionally wall off the target
-      return true;
+      const engine = window.__AEGIS_ENGINE__;
+      if (!engine || typeof engine.findPathAStar !== 'function') {
+        throw new Error('__AEGIS_ENGINE__ not available on window');
+      }
+      // 5x5 grid where goal at (4, 4) is completely walled off by walls at (3, 4), (4, 3)
+      const grid = [
+        ['EMPTY', 'EMPTY', 'EMPTY', 'EMPTY', 'EMPTY'],
+        ['EMPTY', 'EMPTY', 'EMPTY', 'EMPTY', 'EMPTY'],
+        ['EMPTY', 'EMPTY', 'EMPTY', 'EMPTY', 'EMPTY'],
+        ['EMPTY', 'EMPTY', 'EMPTY', 'EMPTY', 'WALL'],
+        ['EMPTY', 'EMPTY', 'EMPTY', 'WALL',  'EMPTY'],
+      ];
+      const result = engine.findPathAStar({
+        grid,
+        rows: 5,
+        cols: 5,
+        start: { r: 0, c: 0 },
+        goal: { r: 4, c: 4 },
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      return {
+        found: result.found,
+        pathLength: result.path.length,
+        nodesExpanded: result.nodesExpandedCount,
+      };
     });
+
+    if (unreachableTest.found !== false || unreachableTest.pathLength !== 0) {
+      throw new Error(`Unreachable destination test failed: expected found=false and pathLength=0, got found=${unreachableTest.found}, pathLength=${unreachableTest.pathLength}`);
+    }
     testReport.checks.push({ test: 'Unreachable Target Graceful Handling', status: 'PASS' });
-    console.log('✓ Unreachable target detected cleanly without crashing');
+    console.log('✓ Unreachable target detected cleanly with found: false without crashing');
 
     // TEST 8: Algorithm Arena Live Execution & Comparative Verification
     console.log('\n[TEST 8] Testing Algorithm Arena 3-Way Benchmark...');
@@ -203,9 +235,16 @@ async function runFinalQA() {
     console.log('=====================================================');
   } catch (err) {
     console.error('Final QA encountered an error:', err);
+    process.exit(1);
   } finally {
     await browser.close();
   }
+
+  if (consoleErrors.length > 0) {
+    console.error(`Final QA failed with ${consoleErrors.length} console errors:`, consoleErrors);
+    process.exit(1);
+  }
+  process.exit(0);
 }
 
 runFinalQA();

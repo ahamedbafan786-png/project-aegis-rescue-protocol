@@ -23,7 +23,7 @@ Last Updated: 2026-10-24
 - [x] **Aegis-1 Character Overhaul**: Hexagonal armored silhouette, articulated side treads with cycling teeth, sweeping directional laser eye, volumetric forward headlights, and ion thruster particle trails.
 - [x] **Sector Environmental Identities**: Distinct procedural graphics for Neon Training Grounds, Collapsed Research Facility (riveted steel plates & hazard tape), Crystal Canyon (rock crevasses & glowing mineral hazard clusters), and Maze Protocol (dark-matter circuit traces).
 - [x] **Dynamic Replanning Storytelling**: Expanding red shockwaves on blocked cells, flashing dashed red invalidated routes with cancellation crosses, and outward cyan radar sweep from Aegis-1.
-- [x] **Responsive Layout**: Fluid down to reviewer viewport $543 \times 589$ and mobile portrait $390 \times 844$ with zero horizontal scroll.
+- [x] **Responsive Layout**: Fluid down to reviewer viewport 543×589 and mobile portrait 390×844 with zero horizontal scroll.
 - [x] **Presentation Mode**: Presenter script collapsed by default with an intuitive toggle pill; high-contrast auditorium projector scaling.
 - [x] **Algorithm Arena Rigor**: Reports median execution time and variability range across 7 repeated runs.
 
