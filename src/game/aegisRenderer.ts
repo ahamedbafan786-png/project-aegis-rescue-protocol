@@ -172,6 +172,22 @@ export class AegisRenderer {
     }
   }
 
+  /**
+   * Resets all visual effects, shockwaves, invalidated path, and particles on simulation reset.
+   */
+  public resetVisualEffects(): void {
+    this.particles = [];
+    this.trailPoints = [];
+    this.shockwaves = [];
+    this.invalidatedPath = [];
+    this.invalidatedAlpha = 0;
+    this.scannerCenter = null;
+    this.scannerRadius = 0;
+    this.scannerMaxRadius = 0;
+    this.highlightedExplored.clear();
+    this.highlightedOpen.clear();
+  }
+
   public render(
     gridModel: GridModel,
     robot: RobotController,

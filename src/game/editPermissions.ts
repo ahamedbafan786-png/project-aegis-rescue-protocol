@@ -86,8 +86,31 @@ export function canEditTile(params: {
     return { allowed: false, reason: 'ROBOT OCCUPYING TILE — ACTION BLOCKED' };
   }
 
+  // In Challenge Mode, only the demolish tool is authorized
+  if (mode === 'CHALLENGE' && tool !== 'demolish') {
+    if (tool === 'eraser') {
+      return {
+        allowed: false,
+        reason: 'ERASER UNAVAILABLE IN CHALLENGE MODE',
+        consumesCharge: false,
+      };
+    }
+    if (tool === 'wall' || tool === 'rough') {
+      return {
+        allowed: false,
+        reason: 'TERRAIN EDITING UNAVAILABLE IN CHALLENGE MODE',
+        consumesCharge: false,
+      };
+    }
+    return {
+      allowed: false,
+      reason: 'CHALLENGE MODE — ONLY DEMOLITION AUTHORIZED',
+      consumesCharge: false,
+    };
+  }
+
   // 1. DEMOLITION / BREACH ACTIONS
-  if (tool === 'demolish' || (mode === 'CHALLENGE' && currentTile === 'DEBRIS')) {
+  if (tool === 'demolish') {
     if (mode === 'CHALLENGE') {
       // Ordinary structural wall check
       if (currentTile === 'WALL') {
@@ -98,11 +121,21 @@ export function canEditTile(params: {
         };
       }
 
-      // Already cleared check
+      // Cleared / empty tile check
       if (currentTile === 'EMPTY') {
+        const wasDebris = isTileDesignatedDebris(coord, mission);
         return {
           allowed: false,
-          reason: 'DEBRIS ALREADY CLEARED',
+          reason: wasDebris ? 'DEBRIS ALREADY CLEARED' : 'CLEAR TERRAIN — NO DEBRIS',
+          consumesCharge: false,
+        };
+      }
+
+      // Rough terrain check
+      if (currentTile === 'ROUGH_TERRAIN') {
+        return {
+          allowed: false,
+          reason: 'ROUGH TERRAIN — CANNOT DEMOLISH',
           consumesCharge: false,
         };
       }

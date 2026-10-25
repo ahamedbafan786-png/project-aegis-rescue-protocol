@@ -4,7 +4,7 @@
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-project--aegis--theta.vercel.app-66DAD5?style=for-the-badge&logo=vercel)](https://project-aegis-theta.vercel.app/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![Tests: Vitest](https://img.shields.io/badge/Tests-50%2F50%20Passing-brightgreen?style=for-the-badge&logo=vitest)](tests)
+[![Tests: Vitest](https://img.shields.io/badge/Tests-54%2F54%20Passing-brightgreen?style=for-the-badge&logo=vitest)](tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8%20Strict-blue?style=for-the-badge&logo=typescript)](tsconfig.json)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](package.json)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-38B2AC?style=for-the-badge&logo=tailwind-css)](src/index.css)
@@ -89,7 +89,7 @@ All screenshots below are captured from live production runs of the application.
 | **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) | Modern utility-first CSS engine with custom color palettes |
 | **Graphics Engine** | HTML5 Canvas 2D | Custom render pipeline with delta-time animation loop and particle physics |
 | **Audio** | Web Audio API | Procedural waveform synthesis (sine, square, sawtooth) with gain nodes |
-| **Unit Testing** | [Vitest 5.0](https://vitest.dev/) | 50 automated tests verifying admissibility, min-heap properties, and replanning |
+| **Unit Testing** | [Vitest 5.0](https://vitest.dev/) | 54 automated tests verifying admissibility, min-heap properties, and replanning |
 | **Browser QA** | [Puppeteer](https://pptr.dev/) | End-to-end automated screenshot verification across viewport sizes |
 | **Hosting** | [Vercel](https://vercel.com/) | Continuous deployment with global edge CDN delivery |
 
@@ -191,10 +191,10 @@ npm test
  ✓ tests/robotCostAccounting.test.ts (5 tests)
  ✓ tests/challengeMechanic.test.ts (4 tests)
  ✓ tests/astar.test.ts (12 tests)
- ✓ tests/v4_2_1_gameplay_integrity.test.ts (22 tests)
+ ✓ tests/v4_2_1_gameplay_integrity.test.ts (26 tests)
 
  Test Files  6 passed (6)
-      Tests  50 passed (50)
+      Tests  54 passed (54)
 ```
 
 Key verified behaviors:
@@ -245,7 +245,7 @@ project-aegis-rescue-protocol/
 │   ├── App.tsx              # Application root state & screen routing
 │   ├── index.css            # Tailwind CSS styling & custom effects
 │   └── main.tsx             # Application DOM mounting point
-├── tests/                   # Automated Vitest test suites (50 unit tests)
+├── tests/                   # Automated Vitest test suites (54 unit tests)
 │   ├── astar.test.ts
 │   ├── challengeMechanic.test.ts
 │   ├── heuristics.test.ts

@@ -58,7 +58,7 @@ Project Aegis V4.2.1 resolves three critical P0 gameplay integrity defects and d
 | [`src/missions/missionData.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/missions/missionData.ts) | Synchronized Corridor Control briefing text: "blast open the direct corridor (16 steps, cost 16) or conserve them and let A* navigate the 24-step northern detour (cost 24)". |
 | [`src/components/Navbar.tsx`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/components/Navbar.tsx) | 1. Updated version badge to `A* V4.2.1`.<br>2. Added `data-nav-item="menu"` on brand logo for automated test navigation. |
 | [`src/components/MissionResultsModal.tsx`](file:///c:/Users/Ahmed/Downloads/DAA%20project/src/components/MissionResultsModal.tsx) | Resolved React hook order violation by lifting `useEffect` above conditional return `if (!isOpen) return null;`. |
-| [`tests/v4_2_1_gameplay_integrity.test.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/tests/v4_2_1_gameplay_integrity.test.ts) | **New Test Suite**: 22 unit & integration tests covering Auto-Hold coordinate snapping, path blockage, permission boundaries, repair charge lifecycle, and zero-charge guards. |
+| [`tests/v4_2_1_gameplay_integrity.test.ts`](file:///c:/Users/Ahmed/Downloads/DAA%20project/tests/v4_2_1_gameplay_integrity.test.ts) | **New Test Suite**: 26 unit & integration tests covering Auto-Hold coordinate snapping, path blockage, permission boundaries, repair charge lifecycle, and zero-charge guards. |
 | [`scripts/qaV4_2_1Acceptance.mjs`](file:///c:/Users/Ahmed/Downloads/DAA%20project/scripts/qaV4_2_1Acceptance.mjs) | **New E2E Browser Suite**: 12 end-to-end scenarios covering desktop & mobile viewports, canvas interactions, and console cleanliness. |
 
 ---
@@ -217,17 +217,17 @@ const handleTriggerBlockage = () => {
 
 ## 7. Automated Test Suites & Verification Record
 
-### 7.1 Vitest Unit & Integration Tests (50/50 Passing)
+### 7.1 Vitest Unit & Integration Tests (54/54 Passing)
 ```
  ✓ tests/heuristics.test.ts (4 tests) 3ms
  ✓ tests/minHeap.test.ts (3 tests) 7ms
  ✓ tests/robotCostAccounting.test.ts (5 tests) 6ms
  ✓ tests/challengeMechanic.test.ts (4 tests) 9ms
  ✓ tests/astar.test.ts (12 tests) 28ms
- ✓ tests/v4_2_1_gameplay_integrity.test.ts (22 tests) 20ms
+ ✓ tests/v4_2_1_gameplay_integrity.test.ts (26 tests) 20ms
 
  Test Files  6 passed (6)
-      Tests  50 passed (50)
+      Tests  54 passed (54)
    Duration  321ms
 ```
 

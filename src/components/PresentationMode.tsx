@@ -255,8 +255,12 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     });
     setActivePath(res.path);
     robot.setPath(res.path, res.totalCost);
+    robot.state = 'IDLE';
+    robot.statusMessage = 'EXHIBIT READY — PRESS DEPLOY';
     setRobotState('IDLE');
     setStatusMessage('EXHIBIT READY — PRESS DEPLOY');
+
+    rendererRef.current?.resetVisualEffects();
   };
 
   // Reliable ahead-cell dynamic blockage trigger
@@ -319,16 +323,19 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     }
   };
 
-  // Demo window detection per Phase 2 requirements (expanded for presenter comfort)
+  // Pre-deploy state: robot at start, not yet deployed
+  const isPreDeploy = robotState === 'IDLE' && telemetry.stepsTaken === 0 && telemetry.replans === 0;
+
+  // Demo window detection: while moving through transit conduit or paused in auto-hold
   const isInDemoWindow =
-    (robotState === 'MOVING' || robotState === 'IDLE') &&
     telemetry.replans === 0 &&
     telemetry.r === 5 &&
-    telemetry.c >= 2 &&
-    telemetry.c <= 8;
+    ((robotState === 'MOVING' && telemetry.c >= 3 && telemetry.c <= 8) ||
+      (hasAutoHeldRef.current && robotState === 'IDLE'));
 
   const isPastDemoWindow =
     telemetry.replans === 0 &&
+    telemetry.stepsTaken > 0 &&
     ((telemetry.r === 5 && telemetry.c > 8) || telemetry.r !== 5) &&
     (robotState === 'MOVING' || robotState === 'IDLE');
 
@@ -349,7 +356,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     statusBadgeColor = 'bg-[#FF9B83]/25 border-[#FF9B83] text-[#FF9B83] animate-pulse';
     statusBadgeDot = 'bg-[#FF9B83] animate-ping';
     displayStatus = 'AUTO-HOLD ACTIVE — READY FOR COLLAPSE';
-  } else if (isInDemoWindow) {
+  } else if (isInDemoWindow && robotState === 'MOVING') {
     statusBadgeColor = 'bg-[#86E3B4]/25 border-[#86E3B4] text-[#86E3B4] animate-pulse';
     statusBadgeDot = 'bg-[#86E3B4] animate-ping';
     displayStatus = 'DEMO READY: TRIGGER COLLAPSE NOW';
@@ -395,6 +402,19 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     triggerButtonContent = (
       <>
         <AlertOctagon className="w-4 h-4 animate-bounce" />
+        <span>TRIGGER COLLAPSE NOW</span>
+      </>
+    );
+  } else if (isPreDeploy) {
+    // Allows triggering collapse before deployment (Scenario C)
+    triggerButtonDisabled = false;
+    triggerButtonClass =
+      'bg-[#FF9B83]/20 hover:bg-[#FF9B83]/30 border-[#FF9B83] text-[#FF9B83] hover:scale-[1.02] active:scale-[0.98]';
+    triggerButtonTitle =
+      'Trigger structural collapse at (5, 10) before deployment to demonstrate initial bypass planning!';
+    triggerButtonContent = (
+      <>
+        <AlertOctagon className="w-4 h-4" />
         <span>TRIGGER COLLAPSE NOW</span>
       </>
     );
@@ -574,6 +594,7 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
           {/* Reset */}
           <button
             onClick={handleReset}
+            data-testid="presentation-reset-btn"
             className="px-3 py-2 sm:py-2.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />

@@ -83,6 +83,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   gridModelRef.current = gridModel;
 
   const [repairCharges, setRepairCharges] = useState<number>(mission.repairCharges ?? 0);
+  const repairChargesRef = useRef<number>(mission.repairCharges ?? 0);
+  repairChargesRef.current = repairCharges;
 
   const robotRef = useRef<RobotController>(new RobotController(mission.start));
 
@@ -325,10 +327,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       onReplay();
       return;
     }
+    const freshModel = new GridModel(mission.rows, mission.cols, mission.start, mission.target);
+    mission.initialWalls.forEach((w) => freshModel.setTile(w.r, w.c, 'WALL'));
+    mission.initialRoughTerrain?.forEach((t) => freshModel.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
+    mission.initialDebris?.forEach((d) => freshModel.setTile(d.r, d.c, 'DEBRIS'));
+    gridModelRef.current = freshModel;
+    setGridModel(freshModel);
+
     const robot = robotRef.current;
-    robot.reset(gridModel.start);
+    robot.reset(mission.start);
+    repairChargesRef.current = mission.repairCharges ?? 0;
     setRepairCharges(mission.repairCharges ?? 0);
-    const res = calculatePath(gridModel.start);
+    const res = calculatePath(mission.start, freshModel.tiles);
     robot.setPath(res.path, res.totalCost);
     setRobotState('IDLE');
     setStatusMessage('SYSTEM STANDBY');
@@ -437,48 +447,27 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     }
   };
 
-  // Canvas Mouse & Drawing Handlers
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsDrawing(true);
-    handleApplyTool(e);
-  };
-
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Canvas Pointer, Mouse & Drawing Handlers
+  const handleApplyToolFromCoords = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
     if (!canvas || !rendererRef.current) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-    const coord = rendererRef.current.screenToGrid(x, y, gridModel.rows, gridModel.cols);
-    rendererRef.current.hoverCoord = coord;
-
-    if (isDrawing && coord) {
-      handleApplyTool(e);
-    }
-  };
-
-  const handleCanvasMouseUp = () => {
-    setIsDrawing(false);
-  };
-
-  const handleApplyTool = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !rendererRef.current) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const coord = rendererRef.current.screenToGrid(x, y, gridModel.rows, gridModel.cols);
+    const coord = rendererRef.current.screenToGrid(x, y, gridModelRef.current.rows, gridModelRef.current.cols);
     if (!coord) return;
 
-    const targetTile = gridModel.tiles[coord.r][coord.c];
+    const currentModel = gridModelRef.current;
+    const targetTile = currentModel.tiles[coord.r][coord.c];
+    const currentCharges = repairChargesRef.current;
+
     const perm = canEditTile({
       tool: activeTool,
       coord,
       currentTile: targetTile,
       mission,
-      repairCharges,
+      repairCharges: currentCharges,
       robotPos: robotRef.current.logicalPos,
     });
 
@@ -490,14 +479,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       return;
     }
 
-    const nextModel = gridModel.clone();
+    const nextModel = currentModel.clone();
     let changed = false;
 
     if (perm.consumesCharge) {
       changed = nextModel.setTile(coord.r, coord.c, perm.newTileType || 'EMPTY');
       if (changed) {
-        setRepairCharges((prev) => Math.max(0, prev - 1));
-        const rem = repairCharges - 1;
+        const rem = Math.max(0, currentCharges - 1);
+        repairChargesRef.current = rem;
+        setRepairCharges(rem);
         setStatusMessage(
           `CONDUIT CLEARED — ${rem} ${rem === 1 ? 'CHARGE REMAINS' : 'CHARGES REMAIN'}`
         );
@@ -555,6 +545,37 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     }
   };
 
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    setIsDrawing(true);
+    handleApplyToolFromCoords(e.clientX, e.clientY);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !rendererRef.current) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const coord = rendererRef.current.screenToGrid(x, y, gridModelRef.current.rows, gridModelRef.current.cols);
+    rendererRef.current.hoverCoord = coord;
+
+    if (isDrawing && coord && activeTool !== 'demolish') {
+      handleApplyToolFromCoords(e.clientX, e.clientY);
+    }
+  };
+
+  const handleCanvasMouseUp = () => {
+    setIsDrawing(false);
+  };
+
+  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length > 0) {
+      const touch = e.touches[0];
+      handleApplyToolFromCoords(touch.clientX, touch.clientY);
+    }
+  };
+
   // Keyboard Shortcuts (Space: Play/Pause, R: Reset, B: Blockage, T: Tools, M: Metrics)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -566,7 +587,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         handleReset();
       } else if (e.code === 'KeyB') {
         e.preventDefault();
-        handleTriggerBlockage();
+        if (gameMode !== 'CHALLENGE') {
+          handleTriggerBlockage();
+        }
       } else if (e.code === 'KeyT') {
         sound.playClick();
         setActiveDrawer((prev) => (prev === 'TOOLS' ? 'CLOSED' : 'TOOLS'));
@@ -574,17 +597,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         sound.playClick();
         setActiveDrawer((prev) => (prev === 'TELEMETRY' ? 'CLOSED' : 'TELEMETRY'));
       } else if (e.code === 'Digit1') {
-        setActiveTool('wall');
+        if (gameMode !== 'CHALLENGE') setActiveTool('wall');
       } else if (e.code === 'Digit2') {
-        setActiveTool('rough');
+        if (gameMode !== 'CHALLENGE') setActiveTool('rough');
       } else if (e.code === 'Digit3') {
-        setActiveTool('eraser');
+        if (gameMode !== 'CHALLENGE') setActiveTool('eraser');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [gridModel, activePath]);
+  }, [gridModel, activePath, gameMode]);
 
   // Determine if blockage button should be disabled
   const canTriggerBlockage =
@@ -953,6 +976,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             onMouseMove={handleCanvasMouseMove}
             onMouseUp={handleCanvasMouseUp}
             onMouseLeave={handleCanvasMouseUp}
+            onTouchStart={handleCanvasTouchStart}
+            style={{ touchAction: 'none' }}
             className="w-full h-full cursor-crosshair"
           />
 
@@ -1159,6 +1184,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {/* Reset Button */}
           <button
             onClick={handleReset}
+            data-testid="hud-reset-btn"
             className="px-3 py-2 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-xs tracking-wide flex items-center gap-1.5 transition-all"
             title="Reset simulation to initial state"
           >
@@ -1167,27 +1193,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </button>
         </div>
 
-        {/* WOW Feature: Trigger Mid-Transit Blockage */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleTriggerBlockage}
-            disabled={!canTriggerBlockage}
-            className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 border transition-all ${
-              canTriggerBlockage
-                ? 'bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#151F36] shadow-[#FF9B83]/30 border-[#FF9B83] hover:scale-[1.02] active:scale-[0.98]'
-                : 'bg-[#2B3B5B]/50 border-[#3E527D]/50 text-[#A1ADC7]/60 cursor-not-allowed'
-            }`}
-            title={
-              canTriggerBlockage
-                ? 'Drop an obstacle on an upcoming path cell to demonstrate real-time A* dynamic replanning'
-                : 'No ahead path cells available to block'
-            }
-          >
-            <AlertOctagon className="w-4 h-4" />
-            <span>Trigger Blockage</span>
-            <span className="hidden md:inline">(Dynamic Replanning)</span>
-          </button>
-        </div>
+        {/* WOW Feature: Trigger Mid-Transit Blockage (Protected from Challenge Mode) */}
+        {gameMode !== 'CHALLENGE' && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTriggerBlockage}
+              disabled={!canTriggerBlockage}
+              className={`px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 border transition-all ${
+                canTriggerBlockage
+                  ? 'bg-gradient-to-r from-[#FF9B83] to-[#FF7B60] hover:from-[#FF7B60] hover:to-[#FF6B50] text-[#151F36] shadow-[#FF9B83]/30 border-[#FF9B83] hover:scale-[1.02] active:scale-[0.98]'
+                  : 'bg-[#2B3B5B]/50 border-[#3E527D]/50 text-[#A1ADC7]/60 cursor-not-allowed'
+              }`}
+              title={
+                canTriggerBlockage
+                  ? 'Drop an obstacle on an upcoming path cell to demonstrate real-time A* dynamic replanning'
+                  : 'No ahead path cells available to block'
+              }
+            >
+              <AlertOctagon className="w-4 h-4" />
+              <span>Trigger Blockage</span>
+              <span className="hidden md:inline">(Dynamic Replanning)</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Algorithm Analysis Modal (Clutter reduction + Pure Math clarity) */}

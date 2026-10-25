@@ -531,4 +531,104 @@ describe('PROJECT AEGIS V4.2.1 — P1 Challenge Briefing Accuracy & Route Verifi
     expect(breachedRes.found).toBe(true);
     expect(breachedRes.path.length - 1).toBe(26);
   });
+
+  it('accurately distinguishes empty non-debris terrain from already-cleared debris', () => {
+    const challenge1 = MISSIONS.find((m) => m.id === 'mission-challenge-1')!;
+    // (5, 8) is designated debris
+    const clearedDebrisRes = canEditTile({
+      tool: 'demolish',
+      coord: { r: 5, c: 8 },
+      currentTile: 'EMPTY',
+      mission: challenge1,
+      repairCharges: 1,
+    });
+    expect(clearedDebrisRes.allowed).toBe(false);
+    expect(clearedDebrisRes.reason).toBe('DEBRIS ALREADY CLEARED');
+
+    // (5, 3) is empty floor that was never debris
+    const clearFloorRes = canEditTile({
+      tool: 'demolish',
+      coord: { r: 5, c: 3 },
+      currentTile: 'EMPTY',
+      mission: challenge1,
+      repairCharges: 1,
+    });
+    expect(clearFloorRes.allowed).toBe(false);
+    expect(clearFloorRes.reason).toBe('CLEAR TERRAIN — NO DEBRIS');
+  });
+
+  it('BLOCKS demolition of rough terrain in Challenge Mode', () => {
+    const challenge1 = MISSIONS.find((m) => m.id === 'mission-challenge-1')!;
+    const roughRes = canEditTile({
+      tool: 'demolish',
+      coord: { r: 2, c: 8 },
+      currentTile: 'ROUGH_TERRAIN',
+      mission: challenge1,
+      repairCharges: 2,
+    });
+    expect(roughRes.allowed).toBe(false);
+    expect(roughRes.reason).toBe('ROUGH TERRAIN — CANNOT DEMOLISH');
+  });
+
+  it('BLOCKS non-demolish tools in Challenge Mode even when targeting debris', () => {
+    const challenge1 = MISSIONS.find((m) => m.id === 'mission-challenge-1')!;
+    const wallOnDebris = canEditTile({
+      tool: 'wall',
+      coord: { r: 5, c: 8 },
+      currentTile: 'DEBRIS',
+      mission: challenge1,
+      repairCharges: 2,
+    });
+    expect(wallOnDebris.allowed).toBe(false);
+    expect(wallOnDebris.consumesCharge).toBe(false);
+    expect(wallOnDebris.reason).toBe('TERRAIN EDITING UNAVAILABLE IN CHALLENGE MODE');
+
+    const eraserOnDebris = canEditTile({
+      tool: 'eraser',
+      coord: { r: 5, c: 8 },
+      currentTile: 'DEBRIS',
+      mission: challenge1,
+      repairCharges: 2,
+    });
+    expect(eraserOnDebris.allowed).toBe(false);
+    expect(eraserOnDebris.consumesCharge).toBe(false);
+    expect(eraserOnDebris.reason).toBe('ERASER UNAVAILABLE IN CHALLENGE MODE');
+  });
+
+  it('guarantees repair charges decrement strictly 2 -> 1 -> 0 under simulated rapid clicks and never become negative', () => {
+    const challenge1 = MISSIONS.find((m) => m.id === 'mission-challenge-1')!;
+    let currentCharges = 2;
+    const model = new GridModel(challenge1.rows, challenge1.cols, challenge1.start, challenge1.target);
+    challenge1.initialDebris?.forEach((d) => model.setTile(d.r, d.c, 'DEBRIS'));
+
+    const clickTargets = [
+      { r: 5, c: 8 }, // Debris 1
+      { r: 5, c: 8 }, // Rapid re-click on Debris 1
+      { r: 5, c: 12 }, // Debris 2
+      { r: 5, c: 12 }, // Rapid re-click on Debris 2
+      { r: 4, c: 4 },  // Wall
+      { r: 5, c: 8 },  // Re-click Debris 1
+    ];
+
+    for (const target of clickTargets) {
+      const tile = model.tiles[target.r][target.c];
+      const perm = canEditTile({
+        tool: 'demolish',
+        coord: target,
+        currentTile: tile,
+        mission: challenge1,
+        repairCharges: currentCharges,
+      });
+
+      if (perm.allowed && perm.consumesCharge) {
+        model.setTile(target.r, target.c, 'EMPTY');
+        currentCharges = Math.max(0, currentCharges - 1);
+      }
+      expect(currentCharges).toBeGreaterThanOrEqual(0);
+    }
+
+    expect(currentCharges).toBe(0);
+    expect(model.tiles[5][8]).toBe('EMPTY');
+    expect(model.tiles[5][12]).toBe('EMPTY');
+  });
 });

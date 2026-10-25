@@ -2,17 +2,19 @@ import puppeteer from 'puppeteer';
 import fs from 'fs';
 import path from 'path';
 
-async function clickButtonWithText(page, text) {
-  return await page.evaluate((btnText) => {
+async function clickButtonWithText(page, text, exact = false) {
+  return await page.evaluate((btnText, isExact) => {
     const buttons = Array.from(document.querySelectorAll('button'));
     for (const b of buttons) {
-      if (b.innerText && b.innerText.toLowerCase().includes(btnText.toLowerCase())) {
+      const bText = (b.innerText || '').trim().toLowerCase();
+      const target = btnText.toLowerCase();
+      if (isExact ? bText === target : bText.includes(target)) {
         b.click();
         return true;
       }
     }
     return false;
-  }, text);
+  }, text, exact);
 }
 
 async function getGridClickCoords(page, targetCol, targetRow, totalCols = 21, totalRows = 11) {
@@ -207,6 +209,36 @@ async function runAcceptanceSuite() {
     }
     report.push({ test: 'Scenario 2: Moving Trigger Collapse (Auto-Hold OFF)', pass: true });
 
+    // -------------------------------------------------------------------------
+    // SCENARIO 2B: TRIGGER COLLAPSE BEFORE DEPLOY (TEST C)
+    // -------------------------------------------------------------------------
+    console.log('\n[SCENARIO 2B] Verifying Trigger Collapse BEFORE Deploy (Test C)...');
+    await clickButtonWithText(page, 'Reset');
+    await new Promise((r) => setTimeout(r, 400));
+
+    // Verify initial pre-deploy status: EXHIBIT READY — PRESS DEPLOY
+    const preDeployText = await page.evaluate(() => document.body.innerText);
+    console.log(`  -> Initial status has EXHIBIT READY — PRESS DEPLOY: ${preDeployText.includes('EXHIBIT READY — PRESS DEPLOY')}`);
+
+    // Trigger collapse BEFORE deploy
+    const preDeployTriggerBtn = await page.$('[data-trigger-blockage]');
+    if (!preDeployTriggerBtn) throw new Error('Trigger Collapse button not found before deploy');
+    await preDeployTriggerBtn.click();
+    console.log('  -> Trigger Collapse pressed BEFORE Deploy!');
+
+    // Wait for detour transit to complete
+    let preDeployDone = false;
+    for (let i = 0; i < 60; i++) {
+      await new Promise((r) => setTimeout(r, 200));
+      const body = await page.evaluate(() => document.body.innerText);
+      if (body.includes('RESCUE COMPLETE · DETOUR SUCCESSFUL')) {
+        preDeployDone = true;
+        break;
+      }
+    }
+    if (!preDeployDone) throw new Error('Pre-deploy collapse detour did not complete with DETOUR SUCCESSFUL');
+    report.push({ test: 'Scenario 2B: Trigger Collapse Before Deploy (Test C)', pass: true });
+
     // Exit Presentation Mode back to Menu
     await page.click('[data-exit-presentation]');
     await new Promise((r) => setTimeout(r, 600));
@@ -353,23 +385,28 @@ async function runAcceptanceSuite() {
     console.log(`  -> Reset restored initial 2/2 charges: ${resetHas2Charges}`);
     if (!resetHas2Charges) throw new Error('Reset failed to restore repair charges to 2/2');
 
+    // Speed up simulation to Max for instant test execution
+    await clickButtonWithText(page, 'Max', true);
+    await new Promise((r) => setTimeout(r, 200));
+
     // Deploy robot and finish mission
     await clickButtonWithText(page, 'Deploy Robot');
     let chalArrived = false;
     for (let i = 0; i < 40; i++) {
-      await new Promise((r) => setTimeout(r, 250));
-      const text = await page.evaluate(() => document.body.innerText);
-      if (text.includes('RESCUE COMPLETE') || text.includes('MISSION ACCOMPLISHED') || text.includes('Mission Accomplished')) {
+      await new Promise((r) => setTimeout(r, 200));
+      const replayBtn = await page.$('[data-action="replay"]');
+      if (replayBtn) {
         chalArrived = true;
         break;
       }
     }
     console.log(`  -> Robot arrived: ${chalArrived}`);
-    await new Promise((r) => setTimeout(r, 800));
+    if (!chalArrived) throw new Error('Robot did not reach target in Deep Vault Quarantine');
+    await new Promise((r) => setTimeout(r, 400));
 
     // Click Replay from results modal
-    const replayed = await clickButtonWithText(page, 'Replay Mission');
-    console.log(`  -> Clicked Replay Mission: ${replayed}`);
+    await page.click('[data-action="replay"]');
+    console.log(`  -> Clicked Replay button in modal`);
     await new Promise((r) => setTimeout(r, 600));
 
     const replayText = await page.evaluate(() => document.body.innerText);
