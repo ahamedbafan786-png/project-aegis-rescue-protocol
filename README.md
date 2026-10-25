@@ -32,15 +32,15 @@ All screenshots below are captured from live production runs of the application.
 
 ### 1. Main Menu & Command Deck
 *Interactive radar canvas with tactical deployment options, sound synthesis toggle, and mission selector.*
-![Main Menu](screenshots/v4_2_01_main_menu.png)
+![Main Menu](screenshots/v4_3_01_main_menu.png)
 
 ### 2. Actual Gameplay & Disaster Environments
 *Tactical grid view featuring high-contrast terrain rendering, rough crystalline fields (3× movement cost), and ambient occlusion.*
-![Actual Gameplay](screenshots/v4_2_05_canyon_visuals.png)
+![Actual Gameplay](screenshots/v4_3_05_crystal_canyon.png)
 
 ### 3. Rescue Robot Navigation
-*Aegis-1 moving along the calculated optimal path with glowing thruster particles, directional visor orientation, and continuous sub-pixel interpolation.*
-![Rescue Robot Navigation](screenshots/v4_04_robot_transit.png)
+*Aegis-1 moving along the calculated optimal path with rotating bogie wheels, directional visor orientation, headlights, and delta-time thruster particles.*
+![Rescue Robot Navigation](screenshots/v4_3_07_robot_in_transit.png)
 
 ### 4. Dynamic A* Replanning
 *When structural collapse blocks the transit corridor, Aegis-1 halts immediately, updates its state, and recalculates an alternate optimal route through the upper bypass.*
@@ -54,29 +54,32 @@ All screenshots below are captured from live production runs of the application.
 *Side-by-side performance analysis comparing `A*`, `Dijkstra`, and `BFS` on identical topologies with live node expansion telemetry.*
 ![Algorithm Arena](screenshots/v4_2_07_arena_bfs_label.png)
 
-### 7. Rescue Completion & Debriefing
-*Docking sequence with survivor cryo-pod, confetti celebration, procedural fanfare, and 3-star performance debrief.*
-![Rescue Completion](screenshots/v4_2_04_docking_and_completion.png)
+### 7. Multi-Stage Rescue Sequence & Debriefing
+*Cinematic docking sequence: approach lock, vitals stabilization scan beam, medical fanfare, and 3-star performance debrief.*
+![Rescue Completion](screenshots/v4_3_08_cinematic_rescue_docking.png)
 
 ---
 
 ## Features
 
-- **Interactive Autonomous Rescue Robot**: Custom Aegis-1 droid model with continuous sub-pixel positional interpolation, directional orientation, sensor light cone, glowing central power core, and delta-time thruster particles.
+- **Interactive Autonomous Rescue Robot**: Custom Aegis-1 droid model with continuous sub-pixel positional interpolation, directional orientation, sensor light cone, rotating bogie wheels, articulated magnetic docking clamps, glowing central power core, and delta-time thruster particles.
 - **Pure TypeScript A\* Pathfinding**: Zero external pathfinding libraries. Implemented from first principles using strictly admissible heuristics and custom binary min-heaps.
 - **Real-Time Dynamic Replanning**: Instant path invalidation observer detects runtime obstructions, halts the droid at its nearest valid coordinate without teleportation, and recomputes the optimal detour on the fly.
 - **Interactive Challenge Missions**: Scenarios requiring resource management, such as *Corridor Control*, where commanders choose between spending repair charges to blast through designated debris or taking longer alternate routes.
 - **Debris Clearance & Wall Immunity**: Dedicated repair energy charges can breach designated emergency debris while preserving permanent structural perimeter walls.
-- **Distinct Rescue Environments**: Handcrafted scenarios with unique topologies:
-  - *Urban Ruins*: Open rubble field with multiple viable routes.
-  - *Seismic Canyon*: Chokepoint navigation with high-friction crystalline fields.
-  - *Subterranean Maze*: Dense corridors demanding deep heuristic guidance.
+- **Distinct Handcrafted Rescue Biomes**: Handcrafted scenarios with unique visual themes and topologies:
+  - *Neon Proving Grounds*: High-contrast digital training ground with glowing cyan conduit lines.
+  - *Collapsed Facility*: Industrial bulkheads with hazard stripes, exposed rebar studs, and structural chokepoints.
+  - *Crystal Canyon*: Stratified rock formations with amethyst crystals (3× movement cost).
+  - *Neural Labyrinth*: Dense server blade corridor network demanding deep heuristic search guidance.
   - *Corridor Control*: Strategic challenge mode balancing repair charges against detour length.
   - *Sandbox Lab*: Full creative canvas with custom wall, rough terrain, and eraser tools.
+- **Cinematic Multi-Stage Rescue Sequence**: Survivor rescue sequence featuring physical approach lock, medical diagnostic cone scan, vitals stabilization, and emerald energy ring expansion.
+- **60 FPS Performance Optimizations**: Static offscreen canvas backdrop caching (`bgCanvas`), bounded device pixel ratio (capped at 2.0 to prevent mobile memory bloat), particle pooling caps, and React reconciliation elimination in the 60 FPS animation loop.
 - **Algorithm Arena (3-Way Benchmark)**: Direct side-by-side comparison of **A\***, **Dijkstra**, and **BFS** measuring explored nodes, path length, step cost, and microsecond execution time.
 - **Presentation Mode**: 60-second high-contrast exhibition mode tailored for auditorium projectors, complete with an **Auto-Hold** toggle for live classroom demonstrations.
 - **Procedural Audio Synthesizer**: Native browser Web Audio API sound engine generating sci-fi UI clicks, servo motors, warning alarms, sonar pings, and victory fanfare without external audio files.
-- **Fully Responsive Architecture**: Dedicated desktop layout, tablet drawer navigation, and mobile viewports (390×844 and 543×589) with persistent telemetry overlays.
+- **Fully Responsive Architecture**: Dedicated desktop layout, tablet drawer navigation, and mobile viewports (320px to 543px) with a persistent, non-overlapping floating repair counter HUD.
 
 ---
 
@@ -282,6 +285,8 @@ project-aegis-rescue-protocol/
 ├── DEMO_GUIDE.md            # Live viva presentation script & defense cheat sheet
 ├── FINAL_QA_REPORT.md       # Comprehensive browser QA audit report
 ├── V4_2_1_GAMEPLAY_INTEGRITY_REPORT.md # Hotfix verification documentation
+├── V4_2_4_MAINTENANCE_QA_RELEASE_REPORT.md # Maintenance & mobile QA release report
+├── V4_3_INDIE_GAME_TRANSFORMATION_REPORT.md # Premium indie game art & performance transformation report
 ├── LICENSE                  # MIT License
 ├── package.json             # Project dependencies and npm scripts
 ├── tsconfig.json            # TypeScript configuration

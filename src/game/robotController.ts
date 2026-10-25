@@ -226,9 +226,9 @@ export class RobotController {
 
     // Compute target angle towards next waypoint
     const targetAngle = Math.atan2(nextWp.r - currentWp.r, nextWp.c - currentWp.c);
-    this.visualAngle = this.lerpAngle(this.visualAngle, targetAngle, Math.min(1.0, deltaSec * 15.0));
+    this.visualAngle = this.lerpAngle(this.visualAngle, targetAngle, Math.min(1.0, deltaSec * 16.0));
 
-    // Advance along the segment
+    // Advance along the segment (exact timing preserved for step contracts and cost accounting)
     const effectiveSpeed = this.speedTilesPerSec * speedMultiplier;
     this.transitionProgress += effectiveSpeed * deltaSec;
 
@@ -248,6 +248,7 @@ export class RobotController {
       // Check if this was the final waypoint
       if (this.currentWaypointIndex >= this.path.length - 1) {
         this.remainingCost = 0;
+        this.visualAngle = targetAngle;
         this.state = 'ARRIVED';
         this.statusMessage = 'RESCUE COMPLETE';
         sound.playVictory();
@@ -255,9 +256,11 @@ export class RobotController {
         this.onStateChange?.(this.state, this.statusMessage);
       }
     } else {
-      // Smooth sub-pixel visual position
-      this.visualX = currentWp.c + (nextWp.c - currentWp.c) * this.transitionProgress;
-      this.visualY = currentWp.r + (nextWp.r - currentWp.r) * this.transitionProgress;
+      // Smooth sub-pixel visual position with mechanical ease-in-out interpolation
+      const t = this.transitionProgress;
+      const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      this.visualX = currentWp.c + (nextWp.c - currentWp.c) * easeT;
+      this.visualY = currentWp.r + (nextWp.r - currentWp.r) * easeT;
     }
   }
 

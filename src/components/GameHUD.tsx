@@ -232,7 +232,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           rescueCompletedRef.current = true;
           setRobotState('ARRIVED');
           setStatusMessage('MISSION ACCOMPLISHED');
-          rendererRef.current?.addArrivalBurst(gridModel.target.r, gridModel.target.c);
+          rendererRef.current?.triggerCelebrationBurst(gridModel.target.r, gridModel.target.c);
           onMissionComplete({
             steps: robot.stepsTaken,
             replans: robot.replansCount,
@@ -246,14 +246,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           rendererRef.current?.triggerRescueSequence(gridModel.target);
         } else {
           rescueTimerRef.current += deltaSec;
-          if (rescueTimerRef.current >= 0.5 && rescueTimerRef.current - deltaSec < 0.5) {
-            setStatusMessage('MEDICAL LINK ESTABLISHED — STABILIZING VITALS');
+          if (rescueTimerRef.current >= 0.4 && rescueTimerRef.current - deltaSec < 0.4) {
+            setStatusMessage('MEDICAL SCAN — ANALYZING VITAL SIGNS');
           }
-          if (rescueTimerRef.current >= 0.9 && rescueTimerRef.current - deltaSec < 0.9) {
+          if (rescueTimerRef.current >= 0.85 && rescueTimerRef.current - deltaSec < 0.85) {
+            setStatusMessage('LIFE SUPPORT LINKED — SURVIVOR STABILIZED');
+          }
+          if (rescueTimerRef.current >= 1.35 && rescueTimerRef.current - deltaSec < 1.35) {
             sound.playRescueSuccess();
-            setStatusMessage('VITALS OPTIMAL — SURVIVOR SECURED');
+            rendererRef.current?.triggerCelebrationBurst(gridModel.target.r, gridModel.target.c);
+            setStatusMessage('RESCUE CONFIRMED — SURVIVOR SECURED');
           }
-          if (rescueTimerRef.current >= 1.4) {
+          if (rescueTimerRef.current >= 1.95) {
             rescueCompletedRef.current = true;
             setRescueSeqActive(false);
             setRobotState('ARRIVED');
@@ -278,19 +282,33 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         );
       }
 
-      // Update Live Telemetry
+      // Update Live Telemetry (Guarded to eliminate 60 FPS React re-renders when idle)
       const tel = robot.getTelemetry();
-      setTelemetry((prev) => ({
-        ...prev,
-        r: tel.currentLogicalCoord.r,
-        c: tel.currentLogicalCoord.c,
-        replans: tel.replansCount,
-        stepsTaken: tel.totalStepsTaken,
-        remainingSteps: tel.remainingSteps,
-        executedCost: tel.executedCost,
-        remainingCost: tel.remainingCost,
-        totalMissionCost: tel.totalMissionCost,
-      }));
+      setTelemetry((prev) => {
+        if (
+          prev.r === tel.currentLogicalCoord.r &&
+          prev.c === tel.currentLogicalCoord.c &&
+          prev.replans === tel.replansCount &&
+          prev.stepsTaken === tel.totalStepsTaken &&
+          prev.remainingSteps === tel.remainingSteps &&
+          prev.executedCost === tel.executedCost &&
+          prev.remainingCost === tel.remainingCost &&
+          prev.totalMissionCost === tel.totalMissionCost
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          r: tel.currentLogicalCoord.r,
+          c: tel.currentLogicalCoord.c,
+          replans: tel.replansCount,
+          stepsTaken: tel.totalStepsTaken,
+          remainingSteps: tel.remainingSteps,
+          executedCost: tel.executedCost,
+          remainingCost: tel.remainingCost,
+          totalMissionCost: tel.totalMissionCost,
+        };
+      });
 
       animId = requestAnimationFrame(loop);
     };

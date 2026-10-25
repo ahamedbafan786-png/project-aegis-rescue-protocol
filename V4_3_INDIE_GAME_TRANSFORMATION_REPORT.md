@@ -48,50 +48,61 @@ Project Aegis V4.3 represents a comprehensive transformation from a functional a
 
 ### 2.1 Hero Aegis-1 Rover Design & Motion Physics
 Previous iterations rendered the robot as a simple directional triangle or generic circle puck. V4.3 delivers a chunky 32×32-pixel rescue rover designed with tactical weight and functional mechanical details:
-- **Articulated Dual Tank Treads**: Continuous rolling rubber tracks on either side of the chassis. During transit, `treadTravelDist` advances proportional to speed, driving rotating track teeth around front/rear sprockets and cycling dual bogie idler wheels with counter-sunk hub pins.
-- **Armored Composite Chassis**: Heavy gunmetal grey (`#1e293b`) and cadet teal (`#0f766e`) hull plates with metallic top highlights, bevelled chamfers, rear heat-exhaust louvers with dynamic thermal flicker, and an articulated magnetic docking clamp at the nose.
-- **Sweeping Cyclops Sensor Eye**: An animated central sensor visor with oscillating beam sweep (`±22°`). When moving, the eye glows cyan (`#38bdf8`); when path recalculation or blockage occurs, it pulses amber/red (`#ef4444`) with an alert indicator (`!`); when docking at the cryo-pod, it shifts to emerald lock (`#10b981`).
-- **Dual Volumetric Searchlights**: Twin forward searchlight cones casting soft radial gradients onto the deck ahead of the rover, providing authentic exploration atmosphere and illuminating obstacles along the path.
-- **Exhaust & Dust Particles**: During transit, procedural micro-particles eject from the rear treads and exhaust vents, dispersing into the ambient simulation deck.
+- **Ground Drop-Shadow**: Elliptical contact shadow (`rgba(4, 8, 18, 0.52)`) positioned beneath the chassis, anchoring Aegis-1 solidly to the simulation deck.
+- **Articulated Dual Tank Treads & Spoke Rollers**: Continuous rolling rubber tracks on either side of the chassis. During transit, `treadTravelDist` advances proportional to speed, driving rotating track teeth around sprockets and cycling dual bogie idler wheels with rotating mechanical spoke crosshairs.
+- **Armored Composite Chassis**: Heavy gunmetal grey (`#526C9E` to `#1D2A42`) hull plates with metallic rim specular highlights, bevelled chamfers, rear heat-exhaust louvers with dynamic thermal flicker, and an articulated magnetic docking clamp at the front bumper featuring dual upper/lower pincers and magnetic lock diodes.
+- **Reactive Cyclops Sensor Eye**: An animated central sensor visor with reactive behavioral states:
+  - *Idle*: Calm exploratory sweep (`±22°`) across the room.
+  - *Moving*: Focused forward lookahead scanning ahead along the transit vector.
+  - *Blocked Alert*: High-frequency frantic alert jitter with radiant red exclamation ping (`!`).
+  - *Arrived / Rescuing*: Steady emerald lock (`#86E3B4`) centered on the stasis capsule.
+- **Dual Volumetric Headlights & Docking Illumination**: Twin forward searchlight cones casting soft radial gradients onto the deck ahead of the rover. When moving, they project teal illumination (`#66DAD5`); when blocked, they flash warning salmon (`#FF9B83`); when docking and during the rescue ceremony, they remain continuously illuminated in emerald (`#86E3B4`) onto the cryo-pod.
+- **Rough Terrain Interaction & Particle Exhaust**: During transit, ion thruster particles eject from the rear treads. When moving over rough terrain, treads throw up amber (`#F5CF79`) or amethyst (`#A695F2`) mineral chips and friction sparks.
+- **Sub-Pixel Mechanical Easing**: Visual position uses a smooth mechanical `ease-in-out` curve (`easeT = t < 0.5 ? 2*t*t : 1 - (-2*t+2)^2 / 2`) between waypoints, providing fluid physical acceleration and deceleration while strictly preserving exact discrete step timing and cost accounting contracts.
 
-### 2.2 Sector Environmental Identities
-Each sector now features a distinct backdrop, deck elevation bevel, floor substrate, and wall bulkhead styling:
+### 2.2 Handcrafted Sector Environmental Identities
+Each sector features a bespoke backdrop, deck elevation bevel, floor substrate, launch pad, and wall bulkhead styling:
 1. **Neon Training Grounds**:
-   - *Backdrop*: Dark cyan-tinted digital void with 60px holographic grid lines and tactical corner target crosses.
-   - *Deck*: Elevated cyber platform with 6px perimeter bevel and cyan neon border striping.
+   - *Backdrop*: Dark cyan-tinted digital void with holographic grid lines and tactical corner target crosses.
+   - *Deck*: Elevated cyber platform with perimeter bevel and cyan neon border striping.
    - *Floor*: Composite dark tiles with seeded corner hex-bolts and subtle circuit traces.
-   - *Walls*: Reinforced bulkheads with embedded cyan luminescent conduits (`#00f0ff`).
+   - *Launch Pad*: Tactical chevron launch platform with corner hydraulic clamps and "BAY-01" designation.
+   - *Walls*: Proving ground composite bulkheads with metallic face plates and embedded cyan luminescent conduits (`#66DAD5`).
 2. **Collapsed Research Facility**:
-   - *Backdrop*: Subterranean bunker with diagonal warning hazard stripes (`#f59e0b` at low alpha) and industrial bulkhead trusses.
+   - *Backdrop*: Subterranean bunker with diagonal warning hazard stripes (`#F5CF79` at low alpha) and overhead steel I-beam spans.
    - *Deck*: Heavy steel-reinforced concrete deck with rust-tinged bevel.
    - *Floor*: Weathered concrete slabs with seeded stress fractures and oil staining.
-   - *Walls*: Dark blast-resistant alloy bulkheads with amber hazard stripes and exposed rebar reinforcement.
+   - *Launch Pad*: Heavy industrial lift plate with perimeter hazard chevrons.
+   - *Walls*: Blast-resistant alloy bulkheads with diagonal hazard caution plates (`#F5CF79`) and exposed structural rebar studs (`#FF9B83`).
 3. **Crystal Canyon**:
-   - *Backdrop*: Deep purple cavern abyss with floating mineral particulates and natural rock stratum lines.
+   - *Backdrop*: Deep purple cavern abyss with floating mineral particulates and natural rock stratum bands.
    - *Deck*: Natural stone platform with dark slate bevel.
    - *Floor*: Basalt flagstones with organic fissures and crystalline dust veins.
-   - *Walls*: Jagged obsidian rock formations embedded with faceted amethyst crystal geodes (`#c084fc`, `#818cf8`) with soft specular glints.
+   - *Launch Pad*: Basalt expedition disc with carved compass crosshairs and glowing purple focus ring.
+   - *Walls*: Multi-faceted basalt rock polygon silhouettes embedded with protruding faceted amethyst crystal obelisks (`#A695F2`, `#C7BAFF`) and specular glints.
 4. **Maze Protocol**:
-   - *Backdrop*: Mainframe data core with vertical memory bus lines and pulsing logic packet nodes.
+   - *Backdrop*: Mainframe data core with micro-circuit buses and glowing junction nodes (`#66DAD5`).
    - *Deck*: High-density silicon substrate deck with emerald PCB traces.
    - *Floor*: Etched integrated circuit traces with seeded surface-mount solder pads.
-   - *Walls*: Monolithic server core bulkheads with emerald bus channels and cooling grille cutouts.
+   - *Launch Pad*: Silicon CPU socket pad with peripheral gold interconnect pins.
+   - *Walls*: Monolithic server blade racks with heatsink cooling slots, illuminated central data bus veins (`#66DAD5`), and logic status LEDs.
 
 ### 2.3 Interactive Cryo-Stasis Pod
-The rescue objective is no longer an abstract star glyph:
+The rescue objective is a living survivor capsule:
 - **Survival Platform**: Octagonal steel docking base with perimeter caution markings and dual magnetic latch receivers.
-- **Cryo-Chamber**: Cylindrical stasis glass containing a vertical cryogenic liquid gradient (`#0284c7` to `#38bdf8`), accompanied by rising micro-bubbles.
+- **Cryo-Chamber**: Cylindrical stasis glass containing a vertical cryogenic liquid gradient (`#0B2538` to `#165A72`), accompanied by animated rising micro-bubbles.
 - **Survivor Silhouette**: A stylized human silhouette suspended in stasis within the cylinder.
 - **Vital ECG Monitor**: An animated green cardiac rhythm line pulsing across an integrated medical sub-panel.
 - **Distress Beacon**: An emergency warning light on the pod crown flashing at 1.5 Hz.
-- **Docking Aura**: Concentric stabilization waves that expand outward when Aegis-1 enters docking proximity.
+- **Diagnostic Scan Fan**: A sweeping medical diagnostic cone sweeping from Aegis-1 over the stasis capsule during Stage 2.
+- **Stabilization & Rescue Confirmation**: Upon rescue lock, a pulsing emerald docking energy ring expands across the deck plate, and a floating medical cross insignia (`✚`) with status banner `+1 SURVIVOR SECURED` rises above the capsule.
 
 ### 2.4 Destructible Bulkhead Debris
-Debris tiles now clearly communicate their breachable nature:
+Debris tiles clearly communicate their breachable nature:
 - High-contrast jagged fracture plates in oxidized metal and concrete.
 - Exposed structural rebar in warning amber/orange (`#f97316`).
 - Interactive tactical demolition reticle when hovered or targeted in Challenge Mode.
-- Dynamic shockwave and particulate burst upon demolition, accompanied by the new `playDemolish()` sound effect.
+- Dynamic shockwave and particulate burst upon demolition, accompanied by the `playDemolish()` sound effect.
 
 ---
 
@@ -99,10 +110,11 @@ Debris tiles now clearly communicate their breachable nature:
 
 ### 3.1 Multi-Stage Rescue Sequence
 When Aegis-1 reaches the cryo-pod, the game executes a coordinated cinematic sequence:
-1. **Approach & Deceleration (0.0s – 0.3s)**: Aegis-1 aligns to the docking platform; searchlights concentrate on the stasis cylinder; rover status updates to `DOCKING LOCK ENGAGED`.
-2. **Diagnostic Scan (0.3s – 0.8s)**: A sweeping holographic medical scan cone passes over the cryo-pod; `playScan()` emits high-frequency bi-directional diagnostic chirps; pod ECG rhythm stabilizes.
-3. **Life-Sign Confirmation (0.8s – 1.4s)**: Cryo-pod status updates to `SURVIVOR STABILIZED`; Aegis-1 cyclops eye glows emerald; `playRescueSuccess()` plays the triumphant 4-chord fanfare; status banner displays `RESCUE PROTOCOL COMPLETE`.
-4. **Mission Results (1.4s)**: The Mission Results Modal transitions in smoothly with full score and telemetry data.
+1. **Approach & Docking Proximity (0.0s – 0.4s)**: Aegis-1 aligns to the docking platform; searchlights illuminate the stasis cylinder; rover status updates to `SURVIVOR CONTACT — COMMENCING RESCUE PROTOCOL`; `sound.playScan()` initiates.
+2. **Diagnostic Medical Scan (0.4s – 0.85s)**: A sweeping holographic medical scan cone passes from Aegis-1 over the cryo-pod; oscillating diagnostic laser line scans vitals; status updates to `MEDICAL SCAN — ANALYZING VITAL SIGNS`.
+3. **Thermal Stabilization & Life Support Link (0.85s – 1.35s)**: Pod ECG rhythm stabilizes into a steady green heartbeat line; status updates to `LIFE SUPPORT LINKED — SURVIVOR STABILIZED`.
+4. **Rescue Confirmation & Celebration (1.35s – 1.95s)**: `sound.playRescueSuccess()` plays the triumphant 4-chord fanfare; radial celebration particle burst fires (`triggerCelebrationBurst`); floating medical cross badge (`✚`) rises with `+1 SURVIVOR SECURED` banner; status updates to `RESCUE CONFIRMED — SURVIVOR SECURED`.
+5. **Mission Results Presentation (1.95s)**: The Mission Results Modal transitions in smoothly with full score and telemetry data after the celebratory beat lands.
 
 ### 3.2 Instant Skip Controls & Automated Fast-Path
 To guarantee that the cinematic sequence never impedes power users or automated test runners:
@@ -201,10 +213,13 @@ All 11 visual acceptance screenshots were captured live via Puppeteer at high DP
 
 ## 6. Performance & Rendering Optimization
 
-1. **60 FPS Delta-Time Independence**: All procedural animations (treads, sensor sweep, searchlights, cryo-pod bubbles, ECG pulse, particle dispersion) calculate offsets based on `deltaSec` clamped to `[0, 0.1]`, ensuring silky 60 FPS motion on high-refresh monitors and consistent speed during frame drops.
-2. **Deterministic Seeded Tile Variations**: Floor tiles and wall features use deterministic bitwise hash functions based on grid coordinates (`(r * 31 + c * 17) & 0xff`) rather than `Math.random()`. This ensures stable rendering across redraws without visual crawling, memory allocations, or re-render churn.
-3. **Bounded Particle Systems**: Dust and demolition spark systems operate with strict particle count limits (max 40) and auto-recycling. Zero garbage collector pressure during continuous transit.
-4. **Canvas Geometry Synchronization**: Grid offsets (`offsetX`, `offsetY`) and cell dimensions (`tileSize`) in `aegisRenderer.ts` maintain exact mathematical parity with Puppeteer coordinate resolution in `scripts/qaAssertionUtils.mjs`. All synthetic browser clicks land dead-center on target grid cells.
+1. **Offscreen Static Backdrop Caching**: Implemented offscreen canvas buffering (`bgCanvas`, `bgCtx`, `drawStaticBackdrop`) for complex static environment elements (deep space/void grids, overhead steel I-beams, caution hazard trusses, circuit buses, and cavern strata lines). Redrawn only upon viewport resize or sector theme change, eliminating dozens of path calculations and gradient creations per frame.
+2. **DPR Clamping**: High-DPI canvas scaling is clamped via `Math.min(window.devicePixelRatio || 1, 2)`. This prevents catastrophic memory allocation spikes and canvas fill rate penalties on 3x/4x mobile displays (e.g. iPhone Super Retina) while maintaining razor-sharp rendering.
+3. **Elimination of React Render Churn**: In both `GameHUD.tsx` and `PresentationMode.tsx`, the 60 FPS animation loops previously called `setTelemetry` unconditionally, triggering 60 React component re-renders per second even when stationary. Guarding `setTelemetry` to return identical `prev` references when fields are unchanged eliminates idle Virtual DOM re-render churn completely.
+4. **60 FPS Delta-Time Independence**: All procedural animations (treads, sensor sweep, searchlights, cryo-pod bubbles, ECG pulse, particle dispersion) calculate offsets based on `deltaSec` clamped to `[0, 0.1]`, ensuring silky 60 FPS motion on high-refresh monitors and consistent speed during frame drops.
+5. **Deterministic Seeded Tile Variations**: Floor tiles and wall features use deterministic bitwise hash functions based on grid coordinates (`(r * 31 + c * 17) & 0xff`) rather than `Math.random()`. This ensures stable rendering across redraws without visual crawling, memory allocations, or re-render churn.
+6. **Bounded Particle Systems & Object Pooling**: Dust and demolition spark systems operate with strict particle count limits (`maxParticles = 75`) and auto-recycling. Zero garbage collector pressure during continuous transit.
+7. **Canvas Geometry Synchronization**: Grid offsets (`offsetX`, `offsetY`) and cell dimensions (`tileSize`) in `aegisRenderer.ts` maintain exact mathematical parity with Puppeteer coordinate resolution in `scripts/qaAssertionUtils.mjs`. All synthetic browser clicks land dead-center on target grid cells.
 
 ---
 

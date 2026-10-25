@@ -179,16 +179,29 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
       }
 
       const tel = robot.getTelemetry();
-      setTelemetry((prev) => ({
-        ...prev,
-        r: tel.currentLogicalCoord.r,
-        c: tel.currentLogicalCoord.c,
-        replans: tel.replansCount,
-        stepsTaken: tel.totalStepsTaken,
-        executedCost: tel.executedCost,
-        remainingCost: tel.remainingCost,
-        totalMissionCost: tel.totalMissionCost,
-      }));
+      setTelemetry((prev) => {
+        if (
+          prev.r === tel.currentLogicalCoord.r &&
+          prev.c === tel.currentLogicalCoord.c &&
+          prev.replans === tel.replansCount &&
+          prev.stepsTaken === tel.totalStepsTaken &&
+          prev.executedCost === tel.executedCost &&
+          prev.remainingCost === tel.remainingCost &&
+          prev.totalMissionCost === tel.totalMissionCost
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          r: tel.currentLogicalCoord.r,
+          c: tel.currentLogicalCoord.c,
+          replans: tel.replansCount,
+          stepsTaken: tel.totalStepsTaken,
+          executedCost: tel.executedCost,
+          remainingCost: tel.remainingCost,
+          totalMissionCost: tel.totalMissionCost,
+        };
+      });
 
       animId = requestAnimationFrame(loop);
     };
