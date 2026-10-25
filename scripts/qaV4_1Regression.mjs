@@ -243,8 +243,9 @@ async function runRegression() {
 
     // 3A: 390x844
     await page.setViewport({ width: 390, height: 844 });
-    await clickButtonWithText(page, 'LAUNCH MISSIONS');
-    await new Promise((r) => setTimeout(r, 500));
+    const clickedMissions = (await clickButtonWithText(page, 'Start Rescue')) || (await clickButtonWithText(page, 'LAUNCH MISSIONS'));
+    if (!clickedMissions) await page.click('[data-nav-item="missions"]');
+    await new Promise((r) => setTimeout(r, 600));
     await page.click('[data-mission-card]');
     await new Promise((r) => setTimeout(r, 800));
 

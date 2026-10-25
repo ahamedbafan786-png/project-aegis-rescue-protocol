@@ -6,6 +6,7 @@ import {
   Compass,
   Eraser,
   Flame,
+  Hammer,
   Layers,
   MapPin,
   Move,
@@ -18,6 +19,7 @@ import {
   Square,
   StepForward,
   Trash2,
+  Wrench,
   X,
   Zap,
 } from 'lucide-react';
@@ -43,7 +45,7 @@ interface GameHUDProps {
   onReplay?: () => void;
 }
 
-export type ToolType = 'wall' | 'rough' | 'eraser' | 'start' | 'target';
+export type ToolType = 'wall' | 'rough' | 'eraser' | 'start' | 'target' | 'demolish';
 
 export const GameHUD: React.FC<GameHUDProps> = ({
   mission,
@@ -69,10 +71,13 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     const model = new GridModel(mission.rows, mission.cols, mission.start, mission.target);
     mission.initialWalls.forEach((w) => model.setTile(w.r, w.c, 'WALL'));
     mission.initialRoughTerrain?.forEach((t) => model.setTile(t.r, t.c, 'ROUGH_TERRAIN'));
+    mission.initialDebris?.forEach((d) => model.setTile(d.r, d.c, 'DEBRIS'));
     return model;
   });
   const gridModelRef = useRef<GridModel>(gridModel);
   gridModelRef.current = gridModel;
+
+  const [repairCharges, setRepairCharges] = useState<number>(mission.repairCharges ?? 0);
 
   const robotRef = useRef<RobotController>(new RobotController(mission.start));
 
@@ -315,6 +320,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     }
     const robot = robotRef.current;
     robot.reset(gridModel.start);
+    setRepairCharges(mission.repairCharges ?? 0);
     const res = calculatePath(gridModel.start);
     robot.setPath(res.path, res.totalCost);
     setRobotState('IDLE');
@@ -461,8 +467,26 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
     const nextModel = gridModel.clone();
     let changed = false;
+    const targetTile = gridModel.tiles[coord.r][coord.c];
 
-    if (activeTool === 'wall') {
+    // Priority 1: Demolish / Breach tool or direct click on DEBRIS
+    if (activeTool === 'demolish' || targetTile === 'DEBRIS') {
+      if (targetTile === 'DEBRIS' || (activeTool === 'demolish' && targetTile === 'WALL')) {
+        if (repairCharges > 0) {
+          changed = nextModel.setTile(coord.r, coord.c, 'EMPTY');
+          if (changed) {
+            setRepairCharges((prev) => Math.max(0, prev - 1));
+            rendererRef.current.addArrivalBurst(coord.r, coord.c);
+            rendererRef.current.addDustParticles(coord.r, coord.c, 16);
+            sound.playDeploy();
+            setStatusMessage(`CONDUIT CLEARED — ${repairCharges - 1} CHARGES REMAIN`);
+          }
+        } else {
+          sound.playBlockedAlert();
+          setStatusMessage('ZERO REPAIR CHARGES — CONSERVE CHARGES OR DETOUR');
+        }
+      }
+    } else if (activeTool === 'wall') {
       changed = nextModel.setTile(coord.r, coord.c, 'WALL');
       if (changed) rendererRef.current.addDustParticles(coord.r, coord.c, 6);
     } else if (activeTool === 'rough') {
@@ -479,13 +503,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     if (changed) {
       sound.playClick();
       setGridModel(nextModel);
+      gridModelRef.current = nextModel;
 
       // Check if robot path is invalidated while moving
       const robot = robotRef.current;
       robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
 
-      // If robot is idle, update path preview
-      if (robot.state === 'IDLE' || robot.state === 'CONFIRMED') {
+      // If robot is idle, confirmed, blocked, or if player opened a corridor mid-transit, update path!
+      if (
+        robot.state === 'IDLE' ||
+        robot.state === 'CONFIRMED' ||
+        robot.state === 'BLOCKED' ||
+        (robot.state === 'MOVING' && (targetTile === 'DEBRIS' || activeTool === 'demolish'))
+      ) {
         const res = findPathAStar({
           grid: nextModel.tiles,
           rows: nextModel.rows,
@@ -495,8 +525,15 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           movementMode,
           heuristicType,
         });
-        setActivePath(res.path);
-        robot.setPath(res.path, res.totalCost);
+        if (res.found) {
+          setActivePath(res.path);
+          robot.setPath(res.path, res.totalCost);
+          if (robot.state === 'BLOCKED') {
+            robot.startMoving();
+            setRobotState('MOVING');
+            setStatusMessage('CORRIDOR RESTORED — RESUMING RESCUE');
+          }
+        }
       }
     }
   };
@@ -555,6 +592,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* Dynamic Status Indicator */}
         <div className="flex items-center gap-2">
+          {mission.repairCharges !== undefined && (
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F5CF79]/15 border border-[#F5CF79]/50 text-[#F5CF79] text-xs font-mono font-bold shadow-sm">
+              <Wrench className="w-3.5 h-3.5" />
+              <span>REPAIR CHARGES: {repairCharges} / {mission.repairCharges}</span>
+            </div>
+          )}
           <div
             className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5 sm:gap-2 border shadow-sm ${
               robotState === 'MOVING'
@@ -650,6 +693,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </span>
                 <button
                   onClick={() => setActiveDrawer('CLOSED')}
+                  aria-label="Close drawer"
                   className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] lg:hidden"
                 >
                   <X className="w-4 h-4" />
@@ -662,6 +706,23 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   Terrain Placement
                 </span>
                 <div className="grid grid-cols-2 gap-1.5">
+                  {mission.repairCharges !== undefined && (
+                    <button
+                      onClick={() => {
+                        sound.playClick();
+                        setActiveTool('demolish');
+                      }}
+                      className={`col-span-2 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                        activeTool === 'demolish'
+                          ? 'bg-[#2B3B5B] border-[#F5CF79] text-[#F5CF79] shadow-sm'
+                          : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                      }`}
+                    >
+                      <Hammer className="w-3.5 h-3.5 text-[#F5CF79]" />
+                      Demolish Debris ({repairCharges})
+                    </button>
+                  )}
+
                   <button
                     onClick={() => {
                       sound.playClick();
@@ -892,6 +953,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 </span>
                 <button
                   onClick={() => setActiveDrawer('CLOSED')}
+                  aria-label="Close drawer"
                   className="p-1 rounded text-[#A1ADC7] hover:text-[#F5F7FF] lg:hidden"
                 >
                   <X className="w-4 h-4" />

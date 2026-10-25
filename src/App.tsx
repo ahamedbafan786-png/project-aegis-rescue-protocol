@@ -188,6 +188,10 @@ export function App() {
           onClose={() => setResultsModalOpen(false)}
           onReplay={handleReplayMission}
           onNextMission={handleNextMission}
+          onExitToMissions={() => {
+            setResultsModalOpen(false);
+            setCurrentScreen('missions');
+          }}
         />
       )}
     </div>

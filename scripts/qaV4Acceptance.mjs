@@ -52,7 +52,8 @@ async function runV4Acceptance() {
     await page.screenshot({ path: ssA1 });
     fs.copyFileSync(ssA1, path.join(artifactsDir, 'v4_01_main_menu.png'));
 
-    await clickButtonWithText(page, 'LAUNCH MISSIONS');
+    const clickedLaunch = (await clickButtonWithText(page, 'Start Rescue')) || (await clickButtonWithText(page, 'LAUNCH MISSIONS'));
+    if (!clickedLaunch) await page.click('[data-nav-item="missions"]');
     await new Promise((r) => setTimeout(r, 600));
 
     const ssA2 = path.join(screenshotsDir, 'v4_02_mission_select.png');

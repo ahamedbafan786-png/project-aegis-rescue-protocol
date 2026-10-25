@@ -21,6 +21,7 @@ interface MissionResultsModalProps {
   onClose?: () => void;
   onReplay: () => void;
   onNextMission: () => void;
+  onExitToMissions?: () => void;
 }
 
 export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
@@ -32,6 +33,7 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
   onClose,
   onReplay,
   onNextMission,
+  onExitToMissions,
 }) => {
   if (!isOpen) return null;
 
@@ -129,18 +131,31 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
         </p>
 
         {/* Action Buttons */}
-        <div className="w-full flex gap-3 mt-6">
+        <div className="w-full flex flex-col sm:flex-row gap-2.5 mt-6">
           <button
             onClick={() => {
               sound.playClick();
               onReplay();
             }}
             data-action="replay"
-            className="flex-1 py-3 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
+            className="flex-1 py-3 px-3 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
             Replay
           </button>
+
+          {onExitToMissions && (
+            <button
+              onClick={() => {
+                sound.playClick();
+                onExitToMissions();
+              }}
+              data-action="exit-to-missions"
+              className="py-3 px-3.5 rounded-xl bg-[#17233D] hover:bg-[#202E4B] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] font-semibold text-xs tracking-wider uppercase transition-colors"
+            >
+              Missions
+            </button>
+          )}
 
           <button
             onClick={() => {
@@ -148,9 +163,9 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
               onNextMission();
             }}
             data-action="next-mission"
-            className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] hover:from-[#5cc7c2] hover:to-[#5fa4ee] text-[#17233D] font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#66DAD5]/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="flex-1 py-3 px-3 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] hover:from-[#5cc7c2] hover:to-[#5fa4ee] text-[#17233D] font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-[#66DAD5]/25 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
-            Next Mission
+            Next
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

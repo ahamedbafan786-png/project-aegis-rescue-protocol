@@ -6,13 +6,15 @@ export interface MissionDefinition {
   codename: string;
   subtitle: string;
   briefing: string;
-  difficulty: 'CADET' | 'TACTICAL' | 'EXPERT' | 'PRESENTATION';
+  difficulty: 'CADET' | 'TACTICAL' | 'EXPERT' | 'PRESENTATION' | 'CHALLENGE';
   rows: number;
   cols: number;
   start: GridCoord;
   target: GridCoord;
   initialWalls: GridCoord[];
   initialRoughTerrain?: GridCoord[];
+  initialDebris?: GridCoord[];
+  repairCharges?: number;
   targetStepsForStar3: number;
   environmentTheme: 'training' | 'facility' | 'canyon' | 'maze' | 'presentation';
   badgeLabel: string;
@@ -156,6 +158,77 @@ export const MISSIONS: MissionDefinition[] = [
       // Outer barrier bounds for aesthetic structure
       { r: 1, c: 8 }, { r: 1, c: 9 }, { r: 1, c: 10 }, { r: 1, c: 11 }, { r: 1, c: 12 },
       { r: 9, c: 8 }, { r: 9, c: 9 }, { r: 9, c: 10 }, { r: 9, c: 11 }, { r: 9, c: 12 },
+    ],
+  },
+  {
+    id: 'mission-challenge-1',
+    title: 'Corridor Control: Breach & Clear',
+    codename: 'CONDUIT BREACH',
+    subtitle: 'Tactical Resource Management & Debris Clearance',
+    briefing: 'Heavy structural blast doors and debris choke the primary conduit. You have 2 Emergency Repair Charges. Decide whether to expend charges to blast open the direct corridor (16 steps) or conserve them and let A* navigate the 28-step rough terrain detour.',
+    difficulty: 'CHALLENGE',
+    rows: 11,
+    cols: 21,
+    start: { r: 5, c: 2 },
+    target: { r: 5, c: 18 },
+    repairCharges: 2,
+    targetStepsForStar3: 18,
+    environmentTheme: 'facility',
+    badgeLabel: 'CHALLENGE 01',
+    initialDebris: [
+      { r: 5, c: 8 },
+      { r: 5, c: 12 },
+    ],
+    initialWalls: [
+      // Top divider wall with access into row 2
+      { r: 4, c: 4 }, { r: 4, c: 5 }, { r: 4, c: 6 },
+      { r: 4, c: 8 }, { r: 4, c: 9 }, { r: 4, c: 10 }, { r: 4, c: 11 }, { r: 4, c: 12 }, { r: 4, c: 13 },
+      { r: 4, c: 15 },
+      // Bottom divider wall (sealed lower quadrant)
+      { r: 6, c: 4 }, { r: 6, c: 5 }, { r: 6, c: 6 }, { r: 6, c: 7 }, { r: 6, c: 8 }, { r: 6, c: 9 },
+      { r: 6, c: 10 }, { r: 6, c: 11 }, { r: 6, c: 12 }, { r: 6, c: 13 }, { r: 6, c: 14 }, { r: 6, c: 15 },
+      { r: 6, c: 16 },
+      { r: 7, c: 4 }, { r: 7, c: 16 },
+      { r: 8, c: 4 }, { r: 8, c: 5 }, { r: 8, c: 6 }, { r: 8, c: 7 }, { r: 8, c: 8 }, { r: 8, c: 9 },
+      { r: 8, c: 10 }, { r: 8, c: 11 }, { r: 8, c: 12 }, { r: 8, c: 13 }, { r: 8, c: 14 }, { r: 8, c: 15 },
+      { r: 8, c: 16 },
+    ],
+    initialRoughTerrain: [
+      // Upper detour field
+      { r: 2, c: 8 }, { r: 2, c: 9 }, { r: 2, c: 10 }, { r: 2, c: 11 }, { r: 2, c: 12 },
+      { r: 3, c: 8 }, { r: 3, c: 9 }, { r: 3, c: 10 }, { r: 3, c: 11 }, { r: 3, c: 12 },
+    ],
+  },
+  {
+    id: 'mission-challenge-2',
+    title: 'Deep Vault Quarantine',
+    codename: 'BULKHEAD OVERRIDE',
+    subtitle: 'Dual-Junction Breaching Strategy',
+    briefing: 'Sub-level quarantine sealed two primary security bulkheads. With 2 demolition charges, strategically breach the debris to establish an optimal direct route through the mineral canyon before survivor life support terminates.',
+    difficulty: 'CHALLENGE',
+    rows: 13,
+    cols: 23,
+    start: { r: 2, c: 2 },
+    target: { r: 10, c: 20 },
+    repairCharges: 2,
+    targetStepsForStar3: 22,
+    environmentTheme: 'canyon',
+    badgeLabel: 'CHALLENGE 02',
+    initialDebris: [
+      { r: 6, c: 7 },
+      { r: 6, c: 15 },
+    ],
+    initialWalls: [
+      // Vertical barrier 1
+      { r: 2, c: 7 }, { r: 3, c: 7 }, { r: 4, c: 7 }, { r: 5, c: 7 },
+      { r: 7, c: 7 }, { r: 8, c: 7 }, { r: 9, c: 7 },
+      // Vertical barrier 2
+      { r: 3, c: 15 }, { r: 4, c: 15 }, { r: 5, c: 15 },
+      { r: 7, c: 15 }, { r: 8, c: 15 }, { r: 9, c: 15 }, { r: 10, c: 15 },
+    ],
+    initialRoughTerrain: [
+      { r: 1, c: 10 }, { r: 1, c: 11 }, { r: 1, c: 12 },
+      { r: 11, c: 10 }, { r: 11, c: 11 }, { r: 11, c: 12 },
     ],
   },
 ];

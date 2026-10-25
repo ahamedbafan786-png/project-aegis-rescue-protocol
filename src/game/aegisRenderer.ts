@@ -284,6 +284,49 @@ export class AegisRenderer {
       });
     }
 
+    // Ambient sector atmosphere particles (crystal dust, sparks, or cyber motes)
+    if (this.particles.length < 24 && Math.random() < 0.12) {
+      const px = this.offsetX + Math.random() * (gridModel.cols * this.tileSize);
+      const py = this.offsetY + Math.random() * (gridModel.rows * this.tileSize);
+      if (theme === 'canyon') {
+        this.particles.push({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 8,
+          vy: -Math.random() * 12 - 4,
+          size: Math.random() * 2.2 + 0.8,
+          color: Math.random() > 0.5 ? '#A695F2' : '#C7BAFF',
+          alpha: 0.65,
+          life: 0,
+          maxLife: 1.8,
+        });
+      } else if (theme === 'facility') {
+        this.particles.push({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 14,
+          vy: Math.random() * 22 + 8,
+          size: Math.random() * 1.8 + 0.8,
+          color: Math.random() > 0.6 ? '#F5CF79' : '#FF9B83',
+          alpha: 0.75,
+          life: 0,
+          maxLife: 0.9,
+        });
+      } else if (theme === 'maze') {
+        this.particles.push({
+          x: px,
+          y: py,
+          vx: (Math.random() - 0.5) * 6,
+          vy: -Math.random() * 10 - 2,
+          size: Math.random() * 1.8 + 0.8,
+          color: '#66DAD5',
+          alpha: 0.55,
+          life: 0,
+          maxLife: 1.5,
+        });
+      }
+    }
+
     // 11. Update & Render Robot Motion Trail
     this.updateAndRenderTrail(robot, deltaSec);
 
@@ -305,33 +348,118 @@ export class AegisRenderer {
         : theme === 'canyon'
         ? '#191526'
         : theme === 'maze'
-        ? '#101726'
+        ? '#0D1524'
         : '#151F36';
     ctx.fillStyle = bgFill;
     ctx.fillRect(0, 0, w, h);
 
-    // Grid accent lines
-    ctx.strokeStyle =
-      theme === 'facility'
-        ? 'rgba(245, 207, 121, 0.08)'
-        : theme === 'canyon'
-        ? 'rgba(166, 149, 242, 0.08)'
-        : 'rgba(102, 218, 213, 0.07)';
-    ctx.lineWidth = 1;
+    if (theme === 'training') {
+      // High-tech training proving ground grid with laser guides
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.08)';
+      ctx.lineWidth = 1;
+      const step = 42;
+      for (let x = 0; x < w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      // Proving ground corner calibration marks
+      ctx.strokeStyle = 'rgba(111, 175, 255, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(16, 16, 32, 32);
+      ctx.strokeRect(w - 48, 16, 32, 32);
+      ctx.strokeRect(16, h - 48, 32, 32);
+      ctx.strokeRect(w - 48, h - 48, 32, 32);
+    } else if (theme === 'facility') {
+      // Collapsed facility: structural sub-grid & amber caution gridlines
+      ctx.strokeStyle = 'rgba(245, 207, 121, 0.07)';
+      ctx.lineWidth = 1;
+      const step = 48;
+      for (let x = 0; x < w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      // Diagonal hazard stripes on upper/lower perimeter
+      ctx.fillStyle = 'rgba(245, 207, 121, 0.05)';
+      for (let x = -h; x < w + h; x += 36) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + 12, 0);
+        ctx.lineTo(x + 12 - 20, 20);
+        ctx.lineTo(x - 20, 20);
+        ctx.closePath();
+        ctx.fill();
+      }
+    } else if (theme === 'canyon') {
+      // Amethyst mineral canyon: organic geological strata bands
+      ctx.strokeStyle = 'rgba(166, 149, 242, 0.08)';
+      ctx.lineWidth = 1.2;
+      for (let y = 30; y < h; y += 54) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.bezierCurveTo(w * 0.3, y - 12, w * 0.7, y + 14, w, y);
+        ctx.stroke();
+      }
+    } else if (theme === 'maze') {
+      // Mainframe labyrinth: pulsing cybernetic data bus traces
+      ctx.strokeStyle = 'rgba(111, 175, 255, 0.09)';
+      ctx.lineWidth = 1;
+      const step = 36;
+      for (let x = 0; x < w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+      // Glowing data bus junction circles
+      ctx.fillStyle = 'rgba(102, 218, 213, 0.14)';
+      for (let x = step * 2; x < w; x += step * 4) {
+        for (let y = step * 2; y < h; y += step * 4) {
+          ctx.beginPath();
+          ctx.arc(x, y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else {
+      // Default / presentation grid
+      ctx.strokeStyle = 'rgba(102, 218, 213, 0.07)';
+      ctx.lineWidth = 1;
+      const step = 48;
+      for (let x = 0; x < w; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+    }
 
-    const step = 48;
-    for (let x = 0; x < w; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
-      ctx.stroke();
-    }
-    for (let y = 0; y < h; y += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
     ctx.restore();
   }
 
@@ -396,9 +524,8 @@ export class AegisRenderer {
     }
 
     // Specific Tile Overlays
-    if (tileType === 'WALL' || tileType === 'DEBRIS') {
-      // 3D Beveled Obstacle Block
-      // Bottom shadow / base plate
+    if (tileType === 'WALL') {
+      // Reinforced Solid Bulkhead Obstacle
       ctx.fillStyle = '#0F1624';
       this.roundRect(x + pad + 1, y + pad + 4, tw - 2, th - 2, 4);
       ctx.fill();
@@ -445,6 +572,45 @@ export class AegisRenderer {
         ctx.fillStyle = 'rgba(255, 155, 131, 0.85)';
         ctx.fillRect(x + tw / 2 - 5, y + th / 2 - 4, 10, 3);
       }
+    } else if (tileType === 'DEBRIS') {
+      // Interactive Collapsed Debris (Destructible via Emergency Repair Charges)
+      ctx.fillStyle = '#111724';
+      this.roundRect(x + pad + 1, y + pad + 3, tw - 2, th - 2, 3);
+      ctx.fill();
+
+      // Fractured rubble chunks
+      const rubbleGrad = ctx.createLinearGradient(x, y, x + tw, y + th);
+      rubbleGrad.addColorStop(0, '#5A463B');
+      rubbleGrad.addColorStop(0.5, '#3D2F28');
+      rubbleGrad.addColorStop(1, '#241B16');
+      ctx.fillStyle = rubbleGrad;
+      this.roundRect(x + pad + 1, y + pad + 1, tw - 2, th - 4, 3);
+      ctx.fill();
+
+      // Jagged fracture cracks
+      ctx.strokeStyle = 'rgba(245, 207, 121, 0.7)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(x + pad + 3, y + pad + th * 0.4);
+      ctx.lineTo(x + pad + tw * 0.45, y + pad + th * 0.55);
+      ctx.lineTo(x + pad + tw * 0.55, y + pad + th * 0.35);
+      ctx.lineTo(x + pad + tw - 3, y + pad + th * 0.65);
+      ctx.stroke();
+
+      // Exposed structural rebar studs
+      ctx.fillStyle = '#FF9B83';
+      ctx.fillRect(x + pad + 5, y + pad + 5, 3, 3);
+      ctx.fillRect(x + pad + tw - 8, y + pad + th - 8, 3, 3);
+
+      // Interactive demolition target crosshair indicator (pulse)
+      const debrisPulse = (Math.sin(this.pulsePhase * 3.5) + 1) * 0.5;
+      ctx.strokeStyle = `rgba(255, 155, 131, ${0.4 + debrisPulse * 0.5})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const cx = x + tw / 2;
+      const cy = y + th / 2;
+      ctx.arc(cx, cy, Math.max(2, tw * 0.22), 0, Math.PI * 2);
+      ctx.stroke();
     } else if (tileType === 'ROUGH_TERRAIN') {
       // High-friction crystalline field
       ctx.fillStyle =
@@ -836,10 +1002,17 @@ export class AegisRenderer {
       ctx.textBaseline = 'middle';
       ctx.fillText('✚', cx, badgeY);
 
-      // Status pill: SECURED
-      ctx.font = 'bold 9px monospace';
-      ctx.fillText('SECURED', cx, badgeY - 10);
+      // Status banner: +1 SURVIVOR SECURED
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('+1 SURVIVOR SECURED', cx, badgeY - 11);
       ctx.restore();
+
+      // Pulsing docking energy ring on deck plate
+      ctx.strokeStyle = `rgba(134, 227, 180, ${Math.max(0, 0.35 + Math.sin(this.pulsePhase * 4) * 0.25)})`;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR + 6 + Math.sin(this.pulsePhase * 3) * 3, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     ctx.restore();
@@ -894,19 +1067,51 @@ export class AegisRenderer {
     ctx.rotate(robot.visualAngle);
     ctx.scale(breathScale, breathScale);
 
-    // 1. Dual Forward Volumetric Headlight Beams
+    // 1. Dual Forward Volumetric Headlight Beams (Left & Right Fender Projectors)
     if (robot.state === 'MOVING' || robot.state === 'CONFIRMED' || robot.state === 'BLOCKED') {
-      const lightGrad = ctx.createRadialGradient(radius * 0.5, 0, 4, radius * 1.6, 0, tileSize * 1.8);
-      lightGrad.addColorStop(0, 'rgba(102, 218, 213, 0.45)');
-      lightGrad.addColorStop(0.6, 'rgba(102, 218, 213, 0.12)');
-      lightGrad.addColorStop(1, 'rgba(102, 218, 213, 0.0)');
+      const headlightLength = Math.max(0.1, tileSize * 1.7);
+      const isBlocked = robot.state === 'BLOCKED';
+      const beamColor = isBlocked ? 'rgba(255, 155, 131, ' : 'rgba(102, 218, 213, ';
 
-      ctx.fillStyle = lightGrad;
+      // Top/Left Headlight Cone
+      const lightGradLeft = ctx.createRadialGradient(
+        radius * 0.7, -radius * 0.75, 2,
+        radius * 1.5, -radius * 0.75, headlightLength
+      );
+      lightGradLeft.addColorStop(0, beamColor + '0.45)');
+      lightGradLeft.addColorStop(0.6, beamColor + '0.12)');
+      lightGradLeft.addColorStop(1, beamColor + '0.0)');
+      ctx.fillStyle = lightGradLeft;
       ctx.beginPath();
-      ctx.moveTo(radius * 0.4, 0);
-      ctx.arc(radius * 0.4, 0, Math.max(0.1, tileSize * 1.8), -Math.PI * 0.24, Math.PI * 0.24);
+      ctx.moveTo(radius * 0.7, -radius * 0.75);
+      ctx.arc(radius * 0.7, -radius * 0.75, headlightLength, -Math.PI * 0.16, Math.PI * 0.12);
       ctx.closePath();
       ctx.fill();
+
+      // Bottom/Right Headlight Cone
+      const lightGradRight = ctx.createRadialGradient(
+        radius * 0.7, radius * 0.75, 2,
+        radius * 1.5, radius * 0.75, headlightLength
+      );
+      lightGradRight.addColorStop(0, beamColor + '0.45)');
+      lightGradRight.addColorStop(0.6, beamColor + '0.12)');
+      lightGradRight.addColorStop(1, beamColor + '0.0)');
+      ctx.fillStyle = lightGradRight;
+      ctx.beginPath();
+      ctx.moveTo(radius * 0.7, radius * 0.75);
+      ctx.arc(radius * 0.7, radius * 0.75, headlightLength, -Math.PI * 0.12, Math.PI * 0.16);
+      ctx.closePath();
+      ctx.fill();
+
+      // Headlight Lamp Bulbs
+      ctx.fillStyle = isBlocked ? '#FF9B83' : '#66DAD5';
+      ctx.shadowColor = isBlocked ? '#FF9B83' : '#66DAD5';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(radius * 0.7, -radius * 0.75, 2.5, 0, Math.PI * 2);
+      ctx.arc(radius * 0.7, radius * 0.75, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
 
     // 2. Dual Ion Thruster Particles
@@ -924,7 +1129,7 @@ export class AegisRenderer {
       });
     }
 
-    // 3. Articulated Side Tread Pods with Animated Track Teeth
+    // 3. Articulated Side Tread Pods with Animated Track Teeth & Bogie Rollers
     ctx.fillStyle = '#141D2E';
     this.roundRect(-radius * 0.95, -radius * 0.95, radius * 1.9, radius * 0.36, 3);
     this.roundRect(-radius * 0.95, radius * 0.6, radius * 1.9, radius * 0.36, 3);
@@ -939,6 +1144,16 @@ export class AegisRenderer {
         ctx.fillRect(toothX, -radius * 0.93, 2, radius * 0.32);
         ctx.fillRect(toothX, radius * 0.62, 2, radius * 0.32);
       }
+    }
+
+    // Mechanical bogie roller hubcaps
+    ctx.fillStyle = '#1E2C48';
+    for (let bi = 0; bi < 3; bi++) {
+      const bx = -radius * 0.55 + bi * (radius * 0.55);
+      ctx.beginPath();
+      ctx.arc(bx, -radius * 0.77, 2.2, 0, Math.PI * 2);
+      ctx.arc(bx, radius * 0.78, 2.2, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     // 4. Hexagonal Armored Silhouette Chassis

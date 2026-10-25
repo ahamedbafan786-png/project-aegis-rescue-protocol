@@ -42,14 +42,17 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
             const stars = progress?.stars || 0;
             const isPresentation = mission.difficulty === 'PRESENTATION';
 
-            const difficultyColors = {
+            const difficultyColors: Record<string, string> = {
               CADET: 'text-[#86E3B4] bg-[#86E3B4]/10 border-[#86E3B4]/30',
               TACTICAL: 'text-[#6FAFFF] bg-[#6FAFFF]/10 border-[#6FAFFF]/30',
               EXPERT: 'text-[#A695F2] bg-[#A695F2]/10 border-[#A695F2]/30',
+              CHALLENGE: 'text-[#F5CF79] bg-[#F5CF79]/15 border-[#F5CF79]/40',
               PRESENTATION: 'text-[#FF9B83] bg-[#FF9B83]/15 border-[#FF9B83]/40',
             };
 
             const wallSet = new Set(mission.initialWalls.map((w) => `${w.r},${w.c}`));
+            const debrisSet = new Set(mission.initialDebris?.map((d) => `${d.r},${d.c}`) || []);
+            const roughSet = new Set(mission.initialRoughTerrain?.map((t) => `${t.r},${t.c}`) || []);
 
             return (
               <div
@@ -101,6 +104,8 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                           const isStart = r === mission.start.r && c === mission.start.c;
                           const isTarget = r === mission.target.r && c === mission.target.c;
                           const isWall = wallSet.has(`${r},${c}`);
+                          const isDebris = debrisSet.has(`${r},${c}`);
+                          const isRough = roughSet.has(`${r},${c}`);
 
                           return (
                             <div
@@ -110,8 +115,12 @@ export const MissionSelect: React.FC<MissionSelectProps> = ({
                                   ? 'bg-[#6FAFFF] shadow-sm shadow-[#6FAFFF]'
                                   : isTarget
                                   ? 'bg-[#86E3B4] shadow-sm shadow-[#86E3B4]'
+                                  : isDebris
+                                  ? 'bg-[#FF9B83] shadow-sm shadow-[#FF9B83]/50'
                                   : isWall
                                   ? 'bg-[#3A507A]'
+                                  : isRough
+                                  ? 'bg-[#F5CF79]/50'
                                   : 'bg-[#1C273D]'
                               }`}
                             />

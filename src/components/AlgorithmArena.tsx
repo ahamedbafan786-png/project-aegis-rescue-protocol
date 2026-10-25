@@ -290,6 +290,7 @@ export const AlgorithmArena: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* A* Card */}
           <div
+            data-tab="astar"
             onClick={() => setActiveTab('astar')}
             className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
               activeTab === 'astar'
@@ -341,6 +342,7 @@ export const AlgorithmArena: React.FC = () => {
 
           {/* Dijkstra Card */}
           <div
+            data-tab="dijkstra"
             onClick={() => setActiveTab('dijkstra')}
             className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
               activeTab === 'dijkstra'
@@ -392,6 +394,7 @@ export const AlgorithmArena: React.FC = () => {
 
           {/* BFS Card */}
           <div
+            data-tab="bfs"
             onClick={() => setActiveTab('bfs')}
             className={`p-4 sm:p-5 rounded-2xl border cursor-pointer transition-all ${
               activeTab === 'bfs'
@@ -453,7 +456,10 @@ export const AlgorithmArena: React.FC = () => {
                 <span className="w-2.5 h-2.5 rounded-sm bg-purple-500/50" /> Explored Nodes
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-[#66DAD5]" /> Confirmed Shortest Path
+                <span className="w-2.5 h-2.5 rounded-sm bg-[#66DAD5]" />{' '}
+                {activeTab === 'bfs'
+                  ? 'Fewest-Step Route (Hop-Optimal)'
+                  : 'Confirmed Shortest Path (Cost-Optimal)'}
               </span>
             </div>
           </div>

@@ -128,7 +128,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           <div className="flex items-center gap-2.5 px-3 py-1 rounded-full bg-[#66DAD5]/10 border border-[#66DAD5]/30">
             <Sparkles className="w-3.5 h-3.5 text-[#66DAD5]" />
             <span className="text-xs font-semibold tracking-wider text-[#66DAD5] uppercase">
-              Autonomous Robot Pathfinding System
+              Autonomous Robot Pathfinding Experience
             </span>
           </div>
 
@@ -139,12 +139,16 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             RESCUE PROTOCOL
           </h2>
 
-          <p className="text-sm sm:text-base text-[#A1ADC7] leading-relaxed max-w-xl">
-            Command intelligent rescue droid <strong className="text-[#F5F7FF]">Aegis-1</strong> across dangerous disaster environments. Powered by a mathematically rigorous, admissible <strong className="text-[#66DAD5]">A* Pathfinding Algorithm</strong> featuring true <strong className="text-[#FF9B83]">real-time dynamic replanning</strong> when obstacles appear mid-transit.
+          <p className="text-base sm:text-lg font-medium text-[#F5CF79] tracking-wide">
+            One robot. Impossible terrain. Every second counts.
+          </p>
+
+          <p className="text-sm sm:text-base text-[#A1ADC7] leading-relaxed max-w-xl -mt-1">
+            Deploy autonomous rescue droid <strong className="text-[#F5F7FF]">Aegis-1</strong> into collapsed disaster sectors. Manage limited repair charges, breach emergency corridors, and watch the admissible <strong className="text-[#66DAD5]">A* Algorithm</strong> calculate guaranteed cost-optimal rescue routes with mid-transit dynamic replanning.
           </p>
 
           {/* Primary Action Button Grid */}
-          <div className="flex flex-wrap gap-3.5 mt-2 w-full">
+          <div className="flex flex-wrap gap-3 mt-2 w-full">
             <button
               onClick={() => {
                 sound.playClick();
@@ -153,7 +157,18 @@ export const MainMenu: React.FC<MainMenuProps> = ({
               className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#66DAD5] to-[#6FAFFF] text-[#17233D] font-bold text-sm tracking-wider uppercase shadow-lg shadow-[#66DAD5]/25 hover:shadow-[#66DAD5]/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2.5"
             >
               <Play className="w-4 h-4 fill-current" />
-              Launch Missions
+              Start Rescue
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playClick();
+                onSelectScreen('missions');
+              }}
+              className="px-5 py-3.5 rounded-xl bg-[#F5CF79]/15 hover:bg-[#F5CF79]/25 border border-[#F5CF79]/50 text-[#F5CF79] font-bold text-sm tracking-wide transition-all flex items-center gap-2 shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Shield className="w-4 h-4" />
+              Challenge Missions
             </button>
 
             <button
@@ -161,7 +176,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 sound.playClick();
                 onLaunchSandbox();
               }}
-              className="px-5 py-3.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-sm tracking-wide transition-all flex items-center gap-2"
+              className="px-4 py-3.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-sm tracking-wide transition-all flex items-center gap-2"
             >
               <Cpu className="w-4 h-4 text-[#66DAD5]" />
               Sandbox Lab
@@ -172,7 +187,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 sound.playClick();
                 onSelectScreen('arena');
               }}
-              className="px-5 py-3.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-sm tracking-wide transition-all flex items-center gap-2"
+              className="px-4 py-3.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-sm tracking-wide transition-all flex items-center gap-2"
             >
               <Layers className="w-4 h-4 text-[#6FAFFF]" />
               Algorithm Arena
@@ -181,9 +196,20 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             <button
               onClick={() => {
                 sound.playClick();
+                onSelectScreen('academy');
+              }}
+              className="px-4 py-3.5 rounded-xl bg-[#2B3B5B] hover:bg-[#374565] border border-[#3E527D] text-[#F5F7FF] font-semibold text-sm tracking-wide transition-all flex items-center gap-2"
+            >
+              <GraduationCap className="w-4 h-4 text-[#A695F2]" />
+              How It Works
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playClick();
                 onSelectScreen('presentation');
               }}
-              className="px-5 py-3.5 rounded-xl bg-[#FF9B83]/15 hover:bg-[#FF9B83]/25 border border-[#FF9B83]/50 text-[#FF9B83] font-bold text-sm tracking-wide transition-all flex items-center gap-2 shadow-sm"
+              className="px-4 py-3.5 rounded-xl bg-[#FF9B83]/15 hover:bg-[#FF9B83]/25 border border-[#FF9B83]/50 text-[#FF9B83] font-bold text-sm tracking-wide transition-all flex items-center gap-2 shadow-sm"
             >
               <MonitorPlay className="w-4 h-4" />
               College Demo Mode
@@ -198,9 +224,9 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-[11px] font-mono text-[#A1ADC7] bg-[#17233D]/80 px-3 py-1.5 rounded-lg border border-[#2B3B5B] z-20">
               <span className="flex items-center gap-1.5 text-[#66DAD5]">
                 <span className="w-2 h-2 rounded-full bg-[#66DAD5] animate-ping" />
-                AEGIS-1 ONLINE
+                AEGIS-1 DEPLOYED
               </span>
-              <span>HEURISTIC: ADMISSIBLE</span>
+              <span className="text-[#86E3B4]">SYSTEMS OPTIMAL</span>
             </div>
           </div>
         </div>
@@ -209,13 +235,13 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       {/* Feature Specification Badges */}
       <div className="max-w-6xl mx-auto w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 mt-8 border-t border-[#2B3B5B] pt-6">
         <div className="bg-[#1F2C47]/50 border border-[#2B3B5B] p-3.5 rounded-xl flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#66DAD5]/10 border border-[#66DAD5]/30 flex items-center justify-center shrink-0">
-            <Cpu className="w-4 h-4 text-[#66DAD5]" />
+          <div className="w-8 h-8 rounded-lg bg-[#F5CF79]/10 border border-[#F5CF79]/30 flex items-center justify-center shrink-0">
+            <Shield className="w-4 h-4 text-[#F5CF79]" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-[#F5F7FF] uppercase">Pure TypeScript A*</h4>
+            <h4 className="text-xs font-bold text-[#F5F7FF] uppercase">Emergency Corridors</h4>
             <p className="text-[11px] text-[#A1ADC7] leading-tight mt-0.5">
-              Custom binary MinHeap priority queue with optimal tie-breaking.
+              Demolish heavy debris with limited charges or conserve for optimal detours.
             </p>
           </div>
         </div>
@@ -227,7 +253,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           <div>
             <h4 className="text-xs font-bold text-[#F5F7FF] uppercase">Dynamic Replanning</h4>
             <p className="text-[11px] text-[#A1ADC7] leading-tight mt-0.5">
-              Robot detects blockages mid-transit and recalculates without teleportation.
+              Robot detects mid-transit blockages and recalculates without teleportation.
             </p>
           </div>
         </div>
@@ -239,19 +265,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({
           <div>
             <h4 className="text-xs font-bold text-[#F5F7FF] uppercase">Algorithm Arena</h4>
             <p className="text-[11px] text-[#A1ADC7] leading-tight mt-0.5">
-              Side-by-side benchmark comparing A*, Dijkstra, and BFS on equal maps.
+              Benchmark A* against Dijkstra and BFS across diverse biomes in real time.
             </p>
           </div>
         </div>
 
         <div className="bg-[#1F2C47]/50 border border-[#2B3B5B] p-3.5 rounded-xl flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#A695F2]/10 border border-[#A695F2]/30 flex items-center justify-center shrink-0">
-            <GraduationCap className="w-4 h-4 text-[#A695F2]" />
+          <div className="w-8 h-8 rounded-lg bg-[#86E3B4]/10 border border-[#86E3B4]/30 flex items-center justify-center shrink-0">
+            <Sparkles className="w-4 h-4 text-[#86E3B4]" />
           </div>
           <div>
-            <h4 className="text-xs font-bold text-[#F5F7FF] uppercase">Viva Ready</h4>
+            <h4 className="text-xs font-bold text-[#F5F7FF] uppercase">Indie Game Feel</h4>
             <p className="text-[11px] text-[#A1ADC7] leading-tight mt-0.5">
-              Built-in Algorithm Academy and 1-Click College Presentation Exhibit.
+              Distinct sector biomes, volumetric headlights, tread tracks, and rescue sequences.
             </p>
           </div>
         </div>
