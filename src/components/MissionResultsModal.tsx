@@ -35,22 +35,24 @@ export const MissionResultsModal: React.FC<MissionResultsModalProps> = ({
   onNextMission,
   onExitToMissions,
 }) => {
+  useEffect(() => {
+    if (isOpen) {
+      // Trigger celebratory confetti burst
+      confetti({
+        particleCount: 65,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#66DAD5', '#86E3B4', '#F5CF79', '#A695F2', '#FF9B83'],
+      });
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Calculate Star Rating
   let stars = 1;
   if (stepsTaken <= targetStepsForStar3 * 1.3) stars = 2;
   if (stepsTaken <= targetStepsForStar3 && replansCount <= 2) stars = 3;
-
-  useEffect(() => {
-    // Trigger celebratory confetti burst
-    confetti({
-      particleCount: 65,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#66DAD5', '#86E3B4', '#F5CF79', '#A695F2', '#FF9B83'],
-    });
-  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#17233D]/80 backdrop-blur-md select-none animate-in fade-in duration-200">

@@ -165,7 +165,7 @@ export const MISSIONS: MissionDefinition[] = [
     title: 'Corridor Control: Breach & Clear',
     codename: 'CONDUIT BREACH',
     subtitle: 'Tactical Resource Management & Debris Clearance',
-    briefing: 'Heavy structural blast doors and debris choke the primary conduit. You have 2 Emergency Repair Charges. Decide whether to expend charges to blast open the direct corridor (16 steps) or conserve them and let A* navigate the 28-step rough terrain detour.',
+    briefing: 'Heavy structural blast doors and debris choke the primary conduit. You have 2 Emergency Repair Charges. Decide whether to expend charges to blast open the direct corridor (16 steps, cost 16) or conserve them and let A* navigate the 24-step northern detour (cost 24).',
     difficulty: 'CHALLENGE',
     rows: 11,
     cols: 21,

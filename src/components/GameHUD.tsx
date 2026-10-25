@@ -1,9 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   AlertOctagon,
-  ChevronLeft,
-  ChevronRight,
-  Compass,
   Eraser,
   Flame,
   Hammer,
@@ -32,10 +29,17 @@ import {
   RobotState,
   TileType,
 } from '../algorithms/types';
-import { AegisRenderer, SectorTheme } from '../game/aegisRenderer';
+import { AegisRenderer } from '../game/aegisRenderer';
 import { GridModel } from '../game/gridModel';
 import { RobotController } from '../game/robotController';
 import { sound } from '../game/soundEngine';
+import {
+  canEditTile,
+  canClearObstacles,
+  canGenerateTopology,
+  getGameMode,
+  ToolType,
+} from '../game/editPermissions';
 import { MissionDefinition } from '../missions/missionData';
 
 interface GameHUDProps {
@@ -45,7 +49,7 @@ interface GameHUDProps {
   onReplay?: () => void;
 }
 
-export type ToolType = 'wall' | 'rough' | 'eraser' | 'start' | 'target' | 'demolish';
+export { type ToolType };
 
 export const GameHUD: React.FC<GameHUDProps> = ({
   mission,
@@ -53,6 +57,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onExit,
   onReplay,
 }) => {
+  const gameMode = getGameMode(mission);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<AegisRenderer | null>(null);
 
@@ -81,8 +86,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
   const robotRef = useRef<RobotController>(new RobotController(mission.start));
 
-  // Controls & Settings
-  const [activeTool, setActiveTool] = useState<ToolType>('wall');
+  // Controls & Settings: Default to demolish in challenge missions, wall in sandbox/rescue
+  const [activeTool, setActiveTool] = useState<ToolType>(() =>
+    mission.repairCharges !== undefined ? 'demolish' : 'wall'
+  );
   const [movementMode, setMovementMode] = useState<MovementMode>('4-directional');
   const [heuristicType, setHeuristicType] = useState<HeuristicType>('manhattan');
   const [speedMultiplier, setSpeedMultiplier] = useState<number>(1.0);
@@ -465,39 +472,49 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     const coord = rendererRef.current.screenToGrid(x, y, gridModel.rows, gridModel.cols);
     if (!coord) return;
 
+    const targetTile = gridModel.tiles[coord.r][coord.c];
+    const perm = canEditTile({
+      tool: activeTool,
+      coord,
+      currentTile: targetTile,
+      mission,
+      repairCharges,
+      robotPos: robotRef.current.logicalPos,
+    });
+
+    if (!perm.allowed) {
+      if (perm.reason) {
+        sound.playBlockedAlert();
+        setStatusMessage(perm.reason);
+      }
+      return;
+    }
+
     const nextModel = gridModel.clone();
     let changed = false;
-    const targetTile = gridModel.tiles[coord.r][coord.c];
 
-    // Priority 1: Demolish / Breach tool or direct click on DEBRIS
-    if (activeTool === 'demolish' || targetTile === 'DEBRIS') {
-      if (targetTile === 'DEBRIS' || (activeTool === 'demolish' && targetTile === 'WALL')) {
-        if (repairCharges > 0) {
-          changed = nextModel.setTile(coord.r, coord.c, 'EMPTY');
-          if (changed) {
-            setRepairCharges((prev) => Math.max(0, prev - 1));
-            rendererRef.current.addArrivalBurst(coord.r, coord.c);
-            rendererRef.current.addDustParticles(coord.r, coord.c, 16);
-            sound.playDeploy();
-            setStatusMessage(`CONDUIT CLEARED — ${repairCharges - 1} CHARGES REMAIN`);
-          }
-        } else {
-          sound.playBlockedAlert();
-          setStatusMessage('ZERO REPAIR CHARGES — CONSERVE CHARGES OR DETOUR');
-        }
+    if (perm.consumesCharge) {
+      changed = nextModel.setTile(coord.r, coord.c, perm.newTileType || 'EMPTY');
+      if (changed) {
+        setRepairCharges((prev) => Math.max(0, prev - 1));
+        const rem = repairCharges - 1;
+        setStatusMessage(
+          `CONDUIT CLEARED — ${rem} ${rem === 1 ? 'CHARGE REMAINS' : 'CHARGES REMAIN'}`
+        );
+        rendererRef.current.addArrivalBurst(coord.r, coord.c);
+        rendererRef.current.addDustParticles(coord.r, coord.c, 16);
+        sound.playDeploy();
       }
-    } else if (activeTool === 'wall') {
-      changed = nextModel.setTile(coord.r, coord.c, 'WALL');
-      if (changed) rendererRef.current.addDustParticles(coord.r, coord.c, 6);
-    } else if (activeTool === 'rough') {
-      changed = nextModel.setTile(coord.r, coord.c, 'ROUGH_TERRAIN');
-    } else if (activeTool === 'eraser') {
-      changed = nextModel.setTile(coord.r, coord.c, 'EMPTY');
     } else if (activeTool === 'start') {
       changed = nextModel.setStart(coord.r, coord.c);
       if (changed) robotRef.current.reset(coord);
     } else if (activeTool === 'target') {
       changed = nextModel.setTarget(coord.r, coord.c);
+    } else if (perm.newTileType) {
+      changed = nextModel.setTile(coord.r, coord.c, perm.newTileType);
+      if (changed && perm.newTileType === 'WALL') {
+        rendererRef.current.addDustParticles(coord.r, coord.c, 6);
+      }
     }
 
     if (changed) {
@@ -703,7 +720,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               {/* Terrain Tools */}
               <div>
                 <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase block mb-1.5">
-                  Terrain Placement
+                  {gameMode === 'CHALLENGE' ? 'Tactical Demolition' : 'Terrain Placement'}
                 </span>
                 <div className="grid grid-cols-2 gap-1.5">
                   {mission.repairCharges !== undefined && (
@@ -723,132 +740,156 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     </button>
                   )}
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      setActiveTool('wall');
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeTool === 'wall'
-                        ? 'bg-[#2B3B5B] border-[#66DAD5] text-[#66DAD5] shadow-sm'
-                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                    }`}
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                    Wall (1)
-                  </button>
+                  {gameMode !== 'CHALLENGE' && (
+                    <>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setActiveTool('wall');
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          activeTool === 'wall'
+                            ? 'bg-[#2B3B5B] border-[#66DAD5] text-[#66DAD5] shadow-sm'
+                            : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                        }`}
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                        Wall (1)
+                      </button>
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      setActiveTool('rough');
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeTool === 'rough'
-                        ? 'bg-[#2B3B5B] border-[#F5CF79] text-[#F5CF79] shadow-sm'
-                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                    }`}
-                  >
-                    <Flame className="w-3.5 h-3.5" />
-                    Rough (2)
-                  </button>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setActiveTool('rough');
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          activeTool === 'rough'
+                            ? 'bg-[#2B3B5B] border-[#F5CF79] text-[#F5CF79] shadow-sm'
+                            : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                        }`}
+                      >
+                        <Flame className="w-3.5 h-3.5" />
+                        Rough (2)
+                      </button>
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      setActiveTool('eraser');
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeTool === 'eraser'
-                        ? 'bg-[#2B3B5B] border-[#FF9B83] text-[#FF9B83] shadow-sm'
-                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                    }`}
-                  >
-                    <Eraser className="w-3.5 h-3.5" />
-                    Eraser (3)
-                  </button>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setActiveTool('eraser');
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          activeTool === 'eraser'
+                            ? 'bg-[#2B3B5B] border-[#FF9B83] text-[#FF9B83] shadow-sm'
+                            : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                        }`}
+                      >
+                        <Eraser className="w-3.5 h-3.5" />
+                        Eraser (3)
+                      </button>
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      setActiveTool('start');
-                    }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeTool === 'start'
-                        ? 'bg-[#2B3B5B] border-[#6FAFFF] text-[#6FAFFF] shadow-sm'
-                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                    }`}
-                  >
-                    <Move className="w-3.5 h-3.5" />
-                    Start
-                  </button>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setActiveTool('start');
+                        }}
+                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          activeTool === 'start'
+                            ? 'bg-[#2B3B5B] border-[#6FAFFF] text-[#6FAFFF] shadow-sm'
+                            : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                        }`}
+                      >
+                        <Move className="w-3.5 h-3.5" />
+                        Start
+                      </button>
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      setActiveTool('target');
-                    }}
-                    className={`col-span-2 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      activeTool === 'target'
-                        ? 'bg-[#2B3B5B] border-[#86E3B4] text-[#86E3B4] shadow-sm'
-                        : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
-                    }`}
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    Relocate Target
-                  </button>
+                      <button
+                        onClick={() => {
+                          sound.playClick();
+                          setActiveTool('target');
+                        }}
+                        className={`col-span-2 flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          activeTool === 'target'
+                            ? 'bg-[#2B3B5B] border-[#86E3B4] text-[#86E3B4] shadow-sm'
+                            : 'bg-[#151F36]/60 border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF]'
+                        }`}
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        Relocate Target
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Map Generation Actions */}
-              <div>
-                <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase block mb-1.5">
-                  Topology Generators
-                </span>
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      const next = gridModel.clone();
-                      next.generateRandomWalls(0.25);
-                      setGridModel(next);
-                      calculatePath();
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" />
-                    Random Obstacles
-                  </button>
+              {/* Map Generation Actions: Restricted to Sandbox Lab */}
+              {gameMode === 'SANDBOX' && (
+                <div>
+                  <span className="text-[10px] font-mono font-semibold text-[#A1ADC7] tracking-wider uppercase block mb-1.5">
+                    Topology Generators
+                  </span>
+                  <div className="flex flex-col gap-1.5">
+                    <button
+                      onClick={() => {
+                        const perm = canGenerateTopology(mission);
+                        if (!perm.allowed) {
+                          sound.playBlockedAlert();
+                          setStatusMessage(perm.reason || 'ACTION NOT PERMITTED');
+                          return;
+                        }
+                        sound.playClick();
+                        const next = gridModel.clone();
+                        next.generateRandomWalls(0.25);
+                        setGridModel(next);
+                        calculatePath();
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
+                    >
+                      <Shuffle className="w-3.5 h-3.5" />
+                      Random Obstacles
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      const next = gridModel.clone();
-                      next.generateMaze();
-                      setGridModel(next);
-                      calculatePath();
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
-                  >
-                    <Route className="w-3.5 h-3.5" />
-                    Generate Maze
-                  </button>
+                    <button
+                      onClick={() => {
+                        const perm = canGenerateTopology(mission);
+                        if (!perm.allowed) {
+                          sound.playBlockedAlert();
+                          setStatusMessage(perm.reason || 'ACTION NOT PERMITTED');
+                          return;
+                        }
+                        sound.playClick();
+                        const next = gridModel.clone();
+                        next.generateMaze();
+                        setGridModel(next);
+                        calculatePath();
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
+                    >
+                      <Route className="w-3.5 h-3.5" />
+                      Generate Maze
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      sound.playClick();
-                      const next = gridModel.clone();
-                      next.clearWalls();
-                      setGridModel(next);
-                      calculatePath();
-                    }}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Clear Obstacles
-                  </button>
+                    <button
+                      onClick={() => {
+                        const perm = canClearObstacles(mission);
+                        if (!perm.allowed) {
+                          sound.playBlockedAlert();
+                          setStatusMessage(perm.reason || 'ACTION NOT PERMITTED');
+                          return;
+                        }
+                        sound.playClick();
+                        const next = gridModel.clone();
+                        next.clearWalls();
+                        setGridModel(next);
+                        calculatePath();
+                      }}
+                      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-[#151F36] hover:bg-[#253554] border border-[#2B3B5B] text-[#A1ADC7] hover:text-[#F5F7FF] transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Clear Obstacles
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Heuristic & Movement Settings */}
               <div>
@@ -927,6 +968,33 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               <Settings2 className="w-3.5 h-3.5" />
               <span>Tools [T]</span>
             </button>
+          )}
+
+          {/* Persistent Mobile / Challenge Repair Energy Counter */}
+          {mission.repairCharges !== undefined && !leftDockOpen && (
+            <div
+              data-testid="mobile-repair-counter"
+              className={`absolute top-3 left-1/2 -translate-x-1/2 z-20 px-3.5 py-1.5 rounded-full border shadow-xl backdrop-blur-md flex items-center gap-2 font-mono text-xs font-bold transition-all ${
+                repairCharges > 0
+                  ? 'bg-[#1C2844]/95 border-[#F5CF79]/80 text-[#F5CF79] shadow-[#F5CF79]/20'
+                  : 'bg-[#1C2844]/95 border-[#FF9B83]/60 text-[#FF9B83]'
+              }`}
+            >
+              <Hammer className={`w-3.5 h-3.5 ${repairCharges > 0 ? 'text-[#F5CF79]' : 'text-[#FF9B83]'}`} />
+              <span>REPAIR ENERGY: {repairCharges} / {mission.repairCharges}</span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: mission.repairCharges }).map((_, i) => (
+                  <span
+                    key={i}
+                    className={`w-2 h-2 rounded-full transition-all ${
+                      i < repairCharges
+                        ? 'bg-[#F5CF79] shadow-sm shadow-[#F5CF79]'
+                        : 'bg-[#2B3B5B] border border-[#3E527D]'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
           )}
 
           {!rightDockOpen && (

@@ -113,10 +113,21 @@ export class RobotController {
     this.onStateChange?.(this.state, this.statusMessage);
   }
 
-  public pause(): void {
+  public pause(customMessage?: string): void {
     if (this.state === 'MOVING') {
       this.state = 'IDLE';
-      this.statusMessage = 'SIMULATION PAUSED';
+      this.statusMessage = customMessage || 'SIMULATION PAUSED';
+      this.onStateChange?.(this.state, this.statusMessage);
+    }
+  }
+
+  public autoHoldAtCurrent(): void {
+    if (this.state === 'MOVING') {
+      this.state = 'IDLE';
+      this.visualX = this.logicalPos.c;
+      this.visualY = this.logicalPos.r;
+      this.transitionProgress = 0;
+      this.statusMessage = 'AUTO-HOLD ACTIVE — READY FOR COLLAPSE';
       this.onStateChange?.(this.state, this.statusMessage);
     }
   }
@@ -134,7 +145,10 @@ export class RobotController {
    * If blocked, immediately halts at current safe integer cell and triggers replanning.
    */
   public checkPathBlocked(isBlockedFn: (r: number, c: number) => boolean): boolean {
-    if (this.state !== 'MOVING' && this.state !== 'CONFIRMED') {
+    if (this.state !== 'MOVING' && this.state !== 'CONFIRMED' && this.state !== 'IDLE') {
+      return false;
+    }
+    if (this.path.length === 0) {
       return false;
     }
 
@@ -151,6 +165,9 @@ export class RobotController {
 
     if (blockedFound) {
       // Immediate halt at current valid grid location to prevent clipping/teleportation
+      this.visualX = this.logicalPos.c;
+      this.visualY = this.logicalPos.r;
+      this.transitionProgress = 0;
       this.state = 'BLOCKED';
       this.replansCount++;
       this.statusMessage = 'PATH BLOCKED — RECALCULATING ROUTE';

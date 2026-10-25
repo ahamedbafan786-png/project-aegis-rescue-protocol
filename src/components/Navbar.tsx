@@ -34,6 +34,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           sound.playClick();
           onSelectScreen('menu');
         }}
+        data-nav-item="menu"
         className="flex items-center gap-2 sm:gap-3 cursor-pointer group shrink-0"
       >
         <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-gradient-to-br from-[#2D3D5E] to-[#1E2B45] border border-[#66DAD5]/60 flex items-center justify-center shadow-md group-hover:border-[#66DAD5] transition-colors">
@@ -45,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Project Aegis
             </span>
             <span className="hidden sm:inline-block text-[10px] bg-[#66DAD5]/15 text-[#66DAD5] px-1.5 py-0.5 rounded font-mono font-semibold border border-[#66DAD5]/30">
-              A* V4.2
+              A* V4.2.1
             </span>
           </div>
           <span className="hidden sm:block text-[10px] text-[#A1ADC7] tracking-wider">

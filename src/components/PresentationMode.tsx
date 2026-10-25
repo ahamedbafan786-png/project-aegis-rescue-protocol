@@ -157,9 +157,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         !hasAutoHeldRef.current
       ) {
         hasAutoHeldRef.current = true;
-        robot.pause();
+        robot.autoHoldAtCurrent();
         setRobotState('IDLE');
-        setStatusMessage('DEMO WINDOW REACHED — TRIGGER COLLAPSE TO REPLAN');
+        setStatusMessage('AUTO-HOLD ACTIVE — READY FOR COLLAPSE');
       }
 
       if (robot.state === 'ARRIVED' && robotState !== 'ARRIVED') {
@@ -207,6 +207,9 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
         setActivePath(newPlan.path);
         robot.setPath(newPlan.path, newPlan.totalCost);
         robot.startMoving();
+        hasAutoHeldRef.current = false;
+        setRobotState('MOVING');
+        setStatusMessage('DYNAMIC REPLAN: A* DETOUR VIA BYPASS');
       } else {
         robot.state = 'FAILED';
         robot.statusMessage = 'NO SAFE ROUTE AVAILABLE';
@@ -306,12 +309,13 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 16);
     rendererRef.current?.triggerBlockageVisual(blockCoord, activePath, robot.logicalPos);
 
-    robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
+    const isBlocked = robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
 
-    // If robot was paused at the demo window, resume transit along the replanned detour
-    if (robot.state === 'IDLE') {
-      robot.startMoving();
+    // If blockage invalidated path, clear auto-hold state and ensure moving state
+    if (isBlocked) {
+      hasAutoHeldRef.current = false;
       setRobotState('MOVING');
+      setStatusMessage('DYNAMIC REPLAN: A* DETOUR VIA BYPASS');
     }
   };
 
@@ -341,6 +345,10 @@ export const PresentationMode: React.FC<PresentationModeProps> = ({ onExit }) =>
     displayStatus = isDetourActive
       ? 'RESCUE COMPLETE · DETOUR SUCCESSFUL'
       : 'RESCUE COMPLETE · DESTINATION REACHED';
+  } else if (hasAutoHeldRef.current && robotState === 'IDLE' && telemetry.replans === 0) {
+    statusBadgeColor = 'bg-[#FF9B83]/25 border-[#FF9B83] text-[#FF9B83] animate-pulse';
+    statusBadgeDot = 'bg-[#FF9B83] animate-ping';
+    displayStatus = 'AUTO-HOLD ACTIVE — READY FOR COLLAPSE';
   } else if (isInDemoWindow) {
     statusBadgeColor = 'bg-[#86E3B4]/25 border-[#86E3B4] text-[#86E3B4] animate-pulse';
     statusBadgeDot = 'bg-[#86E3B4] animate-ping';
