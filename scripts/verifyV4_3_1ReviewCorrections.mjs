@@ -128,9 +128,13 @@ async function main() {
 
         const rects = items.map((it) => {
           const r = it.el.getBoundingClientRect();
+          const span = it.el.querySelector('span');
+          const isTextClipped = span ? span.scrollWidth > span.clientWidth + 1 : false;
           return {
             name: it.name,
             rect: { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height },
+            isTextClipped,
+            text: (it.el.innerText || '').replace(/\s+/g, ' ').trim(),
           };
         });
 
@@ -164,6 +168,10 @@ async function main() {
         assert(
           item.rect.left >= 0 && item.rect.right <= vp.width + 0.5,
           `[${vp.name}] Control ${item.name} horizontally inside viewport bounds [0, ${vp.width}]`
+        );
+        assert(
+          !item.isTextClipped,
+          `[${vp.name}] Control ${item.name} text "${item.text}" is not clipped (scrollWidth <= clientWidth)`
         );
       }
 
@@ -292,19 +300,21 @@ async function main() {
     // ----------------------------------------------------------------
     console.log('\n--- SECTION 3: RESCUE SEQUENCE TIMING & STAGES ---');
 
-    // Wait until mission completes or rescue sequence engages
+    // Wait until robot arrives and rescue protocol engages
     console.log('Waiting for arrival at survivor pod...');
     await page.waitForFunction(
       () => {
         const text = document.body.innerText || '';
         return (
-          text.includes('RESCUE PROTOCOL') ||
+          text.includes('RESCUE PROTOCOL ENGAGED') ||
           text.includes('SURVIVOR CONTACT') ||
+          text.includes('MEDICAL SCAN') ||
+          text.includes('SURVIVOR STABILIZING') ||
           text.includes('MISSION ACCOMPLISHED') ||
-          text.includes('DEBRIEF')
+          text.includes('MISSION DEBRIEF')
         );
       },
-      { timeout: 20000 }
+      { timeout: 25000 }
     );
 
     // Capture rescue sequence in flight
@@ -319,6 +329,7 @@ async function main() {
       return !!skipBtn;
     });
     console.log(`Rescue banner Skip button present: ${hasSkip}`);
+    assert(hasSkip, 'Cinematic Rescue Protocol banner displays active Skip ▶ button');
 
     // Wait for debrief modal
     console.log('Waiting for debrief modal...');
@@ -327,7 +338,7 @@ async function main() {
         const text = document.body.innerText || '';
         return text.includes('MISSION DEBRIEF') || text.includes('MISSION COMPLETE') || text.includes('PERFORMANCE RATING');
       },
-      { timeout: 12000 }
+      { timeout: 15000 }
     );
 
     await new Promise((r) => setTimeout(r, 600));

@@ -74,10 +74,10 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
       </div>
 
-      {/* Navigation Buttons: Row 2 on mobile (col-span-2), Center on desktop */}
+      {/* Navigation Buttons: Responsive 2x2 grid on mobile (<480px), 4-col on >=480px, flex row on desktop */}
       <nav
         aria-label="Primary Navigation"
-        className="col-span-2 sm:col-span-1 row-start-2 sm:row-auto grid grid-cols-4 sm:flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto"
+        className="col-span-2 sm:col-span-1 row-start-2 sm:row-auto grid grid-cols-2 min-[480px]:grid-cols-4 sm:flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto"
       >
         <button
           onClick={() => {
@@ -87,14 +87,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           data-nav-item="missions"
           aria-label="Missions"
           title="Missions"
-          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
+          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1.5 sm:gap-1.5 px-2.5 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'missions' || currentScreen === 'game'
               ? 'bg-[#66DAD5] text-[#17233D] shadow-md shadow-[#66DAD5]/20 font-bold'
               : 'text-[#A1ADC7] hover:text-[#F5F7FF] hover:bg-[#2B3B5B]/50 border border-transparent'
           }`}
         >
           <Play className="w-4 h-4 shrink-0" />
-          <span className="truncate">Missions</span>
+          <span>Missions</span>
         </button>
 
         <button
@@ -105,14 +105,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           data-nav-item="arena"
           aria-label="Algorithm Arena"
           title="Algorithm Arena"
-          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
+          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1.5 sm:gap-1.5 px-2.5 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'arena'
               ? 'bg-[#6FAFFF] text-[#17233D] shadow-md shadow-[#6FAFFF]/20 font-bold'
               : 'text-[#A1ADC7] hover:text-[#F5F7FF] hover:bg-[#2B3B5B]/50 border border-transparent'
           }`}
         >
           <Layers className="w-4 h-4 shrink-0" />
-          <span className="truncate">Arena</span>
+          <span>Arena</span>
         </button>
 
         <button
@@ -123,14 +123,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           data-nav-item="academy"
           aria-label="Algorithm Academy"
           title="Algorithm Academy"
-          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
+          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1.5 sm:gap-1.5 px-2.5 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'academy'
               ? 'bg-[#A695F2] text-[#17233D] shadow-md shadow-[#A695F2]/20 font-bold'
               : 'text-[#A1ADC7] hover:text-[#F5F7FF] hover:bg-[#2B3B5B]/50 border border-transparent'
           }`}
         >
           <GraduationCap className="w-4 h-4 shrink-0" />
-          <span className="truncate">Academy</span>
+          <span>Academy</span>
         </button>
 
         <button
@@ -141,14 +141,14 @@ export const Navbar: React.FC<NavbarProps> = ({
           data-nav-item="presentation"
           aria-label="Presentation Mode"
           title="Presentation Mode"
-          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
+          className={`min-h-[44px] h-[44px] flex items-center justify-center gap-1.5 sm:gap-1.5 px-2.5 sm:px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all whitespace-nowrap shrink-0 ${
             currentScreen === 'presentation'
               ? 'bg-[#FF9B83] text-[#17233D] shadow-md shadow-[#FF9B83]/20 font-bold'
               : 'text-[#FF9B83]/90 hover:text-[#FF9B83] hover:bg-[#FF9B83]/10 border border-[#FF9B83]/30'
           }`}
         >
           <MonitorPlay className="w-4 h-4 shrink-0" />
-          <span className="truncate">Exhibit</span>
+          <span>Presentation</span>
         </button>
       </nav>
     </header>

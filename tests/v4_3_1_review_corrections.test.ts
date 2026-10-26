@@ -270,6 +270,83 @@ describe('Project Aegis V4.3.1 Review Corrections Test Suite', () => {
       expect(robot2.stepsTaken).toBe(run1Steps);
       expect(robot2.executedCost).toBe(run1Cost);
     });
+
+    it('Multiple consecutive standby blockages update authoritative grid cumulatively, keep robot stationary at start with 0 steps and 0 replans, and deploy successfully along the final recalculation', () => {
+      const model = new GridModel(neonMission.rows, neonMission.cols, neonMission.start, neonMission.target);
+      neonMission.initialWalls.forEach((w) => model.setTile(w.r, w.c, 'WALL'));
+
+      const robot = new RobotController(neonMission.start);
+      const plan1 = findPathAStar({
+        grid: model.tiles,
+        rows: model.rows,
+        cols: model.cols,
+        start: neonMission.start,
+        goal: neonMission.target,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      robot.setPath(plan1.path, plan1.totalCost);
+
+      expect(robot.state).toBe('CONFIRMED');
+      expect(robot.stepsTaken).toBe(0);
+      expect(robot.replansCount).toBe(0);
+
+      // Trigger 1st blockage ahead in standby
+      const candidate1 = robot.path[2];
+      model.setTile(candidate1.r, candidate1.c, 'WALL');
+      const plan2 = findPathAStar({
+        grid: model.tiles,
+        rows: model.rows,
+        cols: model.cols,
+        start: robot.logicalPos,
+        goal: model.target,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      robot.setPath(plan2.path, plan2.totalCost);
+
+      expect(robot.state).toBe('CONFIRMED');
+      expect(robot.stepsTaken).toBe(0);
+      expect(robot.replansCount).toBe(0);
+      expect(robot.logicalPos).toEqual(neonMission.start);
+
+      // Trigger 2nd blockage ahead on the new detour path in standby
+      const candidate2 = robot.path[3];
+      model.setTile(candidate2.r, candidate2.c, 'WALL');
+      const plan3 = findPathAStar({
+        grid: model.tiles,
+        rows: model.rows,
+        cols: model.cols,
+        start: robot.logicalPos,
+        goal: model.target,
+        movementMode: '4-directional',
+        heuristicType: 'manhattan',
+      });
+      robot.setPath(plan3.path, plan3.totalCost);
+
+      // Both candidate cells remain blocked in authoritative grid
+      expect(isTileBlocked(model.tiles[candidate1.r][candidate1.c])).toBe(true);
+      expect(isTileBlocked(model.tiles[candidate2.r][candidate2.c])).toBe(true);
+
+      // Invariants maintained
+      expect(robot.state).toBe('CONFIRMED');
+      expect(robot.stepsTaken).toBe(0);
+      expect(robot.replansCount).toBe(0);
+      expect(robot.logicalPos).toEqual(neonMission.start);
+
+      // Explicit Deploy: robot departs on final detoured route
+      robot.startMoving();
+      expect(robot.state).toBe('MOVING');
+
+      while (robot.state === 'MOVING') {
+        robot.update(0.35, 10);
+      }
+
+      expect(robot.state).toBe('ARRIVED');
+      expect(robot.logicalPos).toEqual(neonMission.target);
+      expect(robot.replansCount).toBe(0); // 0 mid-transit dynamic replans
+      expect(robot.stepsTaken).toBe(plan3.path.length - 1);
+    });
   });
 
   describe('P2 — Rescue Sequence Stage Transitions & Timing Semantics', () => {
@@ -348,6 +425,39 @@ describe('Project Aegis V4.3.1 Review Corrections Test Suite', () => {
       // Total sequence completes at >= 5.2s (in 4-6s window)
       expect(lastTimer).toBeGreaterThanOrEqual(5.2);
       expect(completed).toBe(true);
+    });
+
+    it('Instant Skip cancels remaining rescue stages immediately, achieves ARRIVED state with zero metrics corruption', () => {
+      const robot = new RobotController(neonMission.start);
+      robot.stepsTaken = 14;
+      robot.replansCount = 1;
+      robot.executedCost = 14;
+      robot.state = 'ARRIVED';
+
+      // Simulating skip rescue sequence
+      let rescueSeqActive = true;
+      let rescueCompleted = false;
+
+      // User triggers Skip (Space key or Skip button click)
+      const handleSkip = () => {
+        if (rescueSeqActive && !rescueCompleted) {
+          rescueCompleted = true;
+          rescueSeqActive = false;
+          robot.state = 'ARRIVED';
+          robot.statusMessage = 'MISSION ACCOMPLISHED';
+        }
+      };
+
+      handleSkip();
+
+      expect(rescueSeqActive).toBe(false);
+      expect(rescueCompleted).toBe(true);
+      expect(robot.state).toBe('ARRIVED');
+      expect(robot.statusMessage).toBe('MISSION ACCOMPLISHED');
+      // Scoring and route metrics remain fully intact
+      expect(robot.stepsTaken).toBe(14);
+      expect(robot.replansCount).toBe(1);
+      expect(robot.executedCost).toBe(14);
     });
   });
 

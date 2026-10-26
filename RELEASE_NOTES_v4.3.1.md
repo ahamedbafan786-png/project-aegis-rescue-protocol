@@ -41,9 +41,11 @@ Project Aegis V4.3.1 is a targeted maintenance and QA release addressing indepen
 ---
 
 ### Verification Summary
-- **Unit Tests (`npm test`)**: **74 / 74 Passed** across 9 test suites.
+- **Unit Tests (`npm test`)**: **76 / 76 Passed** across 9 test suites (0 failures).
 - **Linter (`npm run lint`)**: **0 Errors**.
-- **Production Build (`npm run build`)**: Clean build in 1.04s.
-- **Automated Browser Verification (`verifyV4_3_1ReviewCorrections.mjs`)**: **245 / 245 Assertions Passed** (0 console errors).
+- **Production Build (`npm run build`)**: Clean build in 588ms (`tsc -b && vite build`).
+- **Automated Browser Verification (`verifyV4_3_1ReviewCorrections.mjs`)**: **288 / 288 Assertions Passed** (0 console errors, 0 control overlaps, 0 clipped text across 7 viewports: 320, 360, 375, 390, 430, 543, 1280px).
+- **Mobile Freeze Gate (`verifyMobileFreezeGate.mjs`)**: **420 / 420 Assertions Passed** across 6 viewports and 3 repair charge states.
+- **Full Acceptance Suite (`qaV4_2_2Acceptance.mjs`)**: **13 / 13 Acceptance Scenarios Passed**.
 - **CI Browser Smoke Test (`qaSmokeCI.mjs`)**: **7 / 7 Checks Passed** locally and on live Vercel production.
-- **GitHub Actions CI**: **All workflows passing green** (run #40308338675).
+- **GitHub Actions CI**: **All workflows passing green**.
