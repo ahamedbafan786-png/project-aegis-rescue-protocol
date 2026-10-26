@@ -249,9 +249,9 @@ export class AegisRenderer {
       this.treadTravelDist += deltaSec * 16;
     }
 
-    // Update Rescue Sequence progress if active
+    // Update Rescue Sequence progress if active (5.2s total duration)
     if (this.rescueActive) {
-      this.rescueProgress = Math.min(1.0, this.rescueProgress + deltaSec * 0.7);
+      this.rescueProgress = Math.min(1.0, this.rescueProgress + deltaSec / 5.2);
     }
 
     // 1. Sector Backdrop
@@ -1192,7 +1192,8 @@ export class AegisRenderer {
     const cx = this.offsetX + coord.c * tileSize + tileSize / 2;
     const cy = this.offsetY + coord.r * tileSize + tileSize / 2;
     const isArrived = robot.state === 'ARRIVED' || this.rescueActive;
-    const isStabilized = isArrived && (robot.state === 'ARRIVED' || this.rescueProgress >= 0.5);
+    const isStabilized = isArrived && (robot.state === 'ARRIVED' || this.rescueProgress >= 0.42);
+    const isConfirmed = isArrived && (robot.state === 'ARRIVED' || this.rescueProgress >= 0.65);
     const pulse = (Math.sin(this.pulsePhase * 2.5) + 1) * 0.5;
 
     ctx.save();
@@ -1348,8 +1349,8 @@ export class AegisRenderer {
       const rx = this.offsetX + robot.visualX * tileSize + tileSize / 2;
       const ry = this.offsetY + robot.visualY * tileSize + tileSize / 2;
 
-      // Diagnostic Medical Scan Fan during Stage 2 (rescueProgress 0.2 to 0.7)
-      if (this.rescueActive && this.rescueProgress >= 0.2 && this.rescueProgress < 0.75) {
+      // Diagnostic Medical Scan Fan during Stage 2 (rescueProgress 0.19 to 0.42)
+      if (this.rescueActive && this.rescueProgress >= 0.19 && this.rescueProgress < 0.42) {
         ctx.save();
         const scanGrad = ctx.createRadialGradient(rx, ry, 2, cx, cy, tileSize * 1.8);
         scanGrad.addColorStop(0, 'rgba(102, 218, 213, 0.45)');
@@ -1394,7 +1395,7 @@ export class AegisRenderer {
       ctx.setLineDash([]);
       ctx.restore();
 
-      // Floating Medical Cross Icon rising above pod during Stage 4 / confirmed
+      // Floating Medical Cross Icon rising above pod during Stage 3+ (vitals stabilized)
       if (isStabilized) {
         const badgeY = mastTopY - 14 - Math.sin(this.pulsePhase * 3) * 3;
         ctx.save();
@@ -1406,17 +1407,19 @@ export class AegisRenderer {
         ctx.textBaseline = 'middle';
         ctx.fillText('✚', cx, badgeY);
 
-        // Status banner: +1 SURVIVOR SECURED
-        ctx.font = 'bold 10px monospace';
-        ctx.fillText('+1 SURVIVOR SECURED', cx, badgeY - 11);
-        ctx.restore();
+        // Status banner: +1 SURVIVOR SECURED strictly after vitals stabilization (Stage 4+)
+        if (isConfirmed) {
+          ctx.font = 'bold 10px monospace';
+          ctx.fillText('+1 SURVIVOR SECURED', cx, badgeY - 11);
 
-        // Pulsing docking energy ring on deck plate
-        ctx.strokeStyle = `rgba(134, 227, 180, ${Math.max(0, 0.4 + Math.sin(this.pulsePhase * 4) * 0.25)})`;
-        ctx.lineWidth = 2.0;
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseR + 6 + Math.sin(this.pulsePhase * 3) * 3, 0, Math.PI * 2);
-        ctx.stroke();
+          // Pulsing docking energy ring on deck plate
+          ctx.strokeStyle = `rgba(134, 227, 180, ${Math.max(0, 0.4 + Math.sin(this.pulsePhase * 4) * 0.25)})`;
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          ctx.arc(cx, cy, baseR + 6 + Math.sin(this.pulsePhase * 3) * 3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
     }
 

@@ -246,18 +246,31 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           rendererRef.current?.triggerRescueSequence(gridModel.target);
         } else {
           rescueTimerRef.current += deltaSec;
-          if (rescueTimerRef.current >= 0.4 && rescueTimerRef.current - deltaSec < 0.4) {
+          const t = rescueTimerRef.current;
+          const prevT = t - deltaSec;
+
+          // Stage 2: Medical Scanning (1.0s to 2.2s)
+          if (t >= 1.0 && prevT < 1.0) {
+            sound.playScan();
             setStatusMessage('MEDICAL SCAN — ANALYZING VITAL SIGNS');
           }
-          if (rescueTimerRef.current >= 0.85 && rescueTimerRef.current - deltaSec < 0.85) {
-            setStatusMessage('LIFE SUPPORT LINKED — SURVIVOR STABILIZED');
+          // Stage 3: Vitals Stabilization (2.2s to 3.4s)
+          if (t >= 2.2 && prevT < 2.2) {
+            setStatusMessage('LIFE SUPPORT LINKED — SURVIVOR STABILIZING');
           }
-          if (rescueTimerRef.current >= 1.35 && rescueTimerRef.current - deltaSec < 1.35) {
+          // Stage 4: Confirmation of Successful Rescue (3.4s to 4.4s)
+          // SURVIVOR SECURED appears strictly after vitals stabilization is confirmed
+          if (t >= 3.4 && prevT < 3.4) {
             sound.playRescueSuccess();
             rendererRef.current?.triggerCelebrationBurst(gridModel.target.r, gridModel.target.c);
             setStatusMessage('RESCUE CONFIRMED — SURVIVOR SECURED');
           }
-          if (rescueTimerRef.current >= 1.95) {
+          // Stage 5: Short Celebration & Final Extraction (4.4s to 5.2s)
+          if (t >= 4.4 && prevT < 4.4) {
+            setStatusMessage('EXTRACTION COMPLETE — PREPARING DEBRIEF');
+          }
+          // Stage 6: Debrief Screen (5.2s)
+          if (t >= 5.2) {
             rescueCompletedRef.current = true;
             setRescueSeqActive(false);
             setRobotState('ARRIVED');
@@ -478,23 +491,34 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     rendererRef.current?.addDustParticles(blockCoord.r, blockCoord.c, 14);
     rendererRef.current?.triggerBlockageVisual(blockCoord, activePath, robot.logicalPos);
 
-    // Prompt robot to inspect remaining path
-    const isBlocked = robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
+    // Check if we are in pre-deployment standby (robot has not yet started moving)
+    const isPreDeployment =
+      (robot.state === 'IDLE' || robot.state === 'CONFIRMED') &&
+      robot.stepsTaken === 0;
 
-    // If robot was idle, recalculate immediately
-    if (!isBlocked && (robot.state === 'IDLE' || robot.state === 'CONFIRMED')) {
-      const res = findPathAStar({
-        grid: nextModel.tiles,
-        rows: nextModel.rows,
-        cols: nextModel.cols,
-        start: robot.logicalPos,
-        goal: nextModel.target,
-        movementMode,
-        heuristicType,
-      });
-      setActivePath(res.path);
-      robot.setPath(res.path, res.totalCost);
+    if (isPreDeployment) {
+      // Pre-deployment planning: authoritative grid is updated, recalculate initial route
+      const res = calculatePath(robot.logicalPos, nextModel.tiles);
+      if (res.found) {
+        setActivePath(res.path);
+        robot.setPath(res.path, res.totalCost);
+        // Remain stationary in confirmed standby state, zero steps and zero replans
+        robot.state = 'CONFIRMED';
+        robot.statusMessage = 'ROUTE RECALCULATED — READY TO DEPLOY';
+        setRobotState('CONFIRMED');
+        setStatusMessage('ROUTE RECALCULATED — READY TO DEPLOY');
+      } else {
+        robot.state = 'FAILED';
+        robot.statusMessage = 'NO SAFE ROUTE AVAILABLE';
+        setRobotState('FAILED');
+        setStatusMessage('NO SAFE ROUTE AVAILABLE');
+        sound.playFailed();
+      }
+      return;
     }
+
+    // Mid-transit blockage handling: prompt robot to inspect remaining path
+    robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
   };
 
   // Step-by-Step Teaching Mode
@@ -597,7 +621,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
       // Check if robot path is invalidated while moving
       const robot = robotRef.current;
-      robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
+      if (robot.state === 'MOVING') {
+        robot.checkPathBlocked((r, c) => isTileBlocked(nextModel.tiles[r][c]));
+      }
 
       // If robot is idle, confirmed, blocked, or if player opened a corridor mid-transit, update path!
       if (
